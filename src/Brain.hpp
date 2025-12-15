@@ -6,7 +6,9 @@ namespace Brain {
   class Brain {
     public:
       Brain() = default;
-      ~Brain() = default;
+      ~Brain() {
+        stop();
+      }
 
       int start();
       int stop();
@@ -19,8 +21,8 @@ namespace Brain {
       void handleTurn(const std::string &payload);
       void handleBegin(const std::string &payload);
       void handleBoard(const std::string &payload);
-      void handleInfo(const std::string &payload);
       void handleEnd(const std::string &payload);
+      void handleInfo(const std::string &payload);
       void handleAbout(const std::string &payload);
       void handleRecstart(const std::string &payload);
       void handleRestart(const std::string &payload);
@@ -33,11 +35,15 @@ namespace Brain {
       void handleDebug(const std::string &payload);
       void handleSuggest(const std::string &payload);
 
+      bool checkTerminator(std::string &payload);
+
       // Multi-threading process
       int inputHandler();
 
     private:
+      int _boardSize{0};
       std::thread _inputHandler;
+      std::atomic<bool> _running{false};
       std::unordered_map<std::string,
                          std::function<void(const std::string &payload)>>
           _commands;

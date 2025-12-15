@@ -1,9 +1,9 @@
 #include <string>
 #include "Brain.hpp"
-#include "HelpMessage.hpp"
 #include "Constants.hpp"
+#include "HelpMessage.hpp"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   Brain::Brain brain;
   if (argc > 1) {
     for (int i = 1; i < argc; i++) {
@@ -11,13 +11,17 @@ int main(int argc, char* argv[]) {
       if (arg == "--help" || arg == "-h") {
         try {
           HelpMessage::printHelp();
-        } catch (const std::exception& e) {
-          std::cerr << "An error occurred while displaying help: " << e.what() << std::endl;
+        } catch (const std::exception &e) {
+          std::cerr << "An error occurred while displaying help: " << e.what()
+                    << std::endl;
         }
         return Constants::SUCCESS;
       }
     }
     return Constants::ERROR;
   }
-  return brain.start();
+  brain.start();
+  // Wait for input thread to finish naturally (stop is called by END command or
+  // destructor)
+  return Constants::SUCCESS;
 }
