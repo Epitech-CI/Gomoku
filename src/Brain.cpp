@@ -96,6 +96,7 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         << std::endl;
     return;
   }
+  // TO DO: Choose a move and update _goban accordingly
 }
 
 void Brain::Brain::handleBoard(const std::string &payload) {
