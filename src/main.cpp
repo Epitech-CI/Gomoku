@@ -21,7 +21,5 @@ int main(int argc, char *argv[]) {
     return Constants::ERROR;
   }
   brain.start();
-  // Wait for input thread to finish naturally (stop is called by END command or
-  // destructor)
   return Constants::SUCCESS;
 }

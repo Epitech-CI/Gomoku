@@ -2,6 +2,8 @@
 
 #include <thread>
 #include <unordered_map>
+#include "Info.hpp"
+
 namespace Brain {
   class Brain {
     public:
@@ -41,6 +43,7 @@ namespace Brain {
       int inputHandler();
 
     private:
+      Info info;
       int _boardSize{0};
       std::vector<char> _goban;
       std::thread _inputHandler;

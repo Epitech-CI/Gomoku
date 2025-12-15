@@ -1,11 +1,11 @@
 #pragma once
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 namespace HelpMessage {
   inline void printHelp() {
-    std::ifstream helpFile("./src/HELP_MESSAGE.txt");
+    std::ifstream helpFile(Constants::HELP_MESSAGE_FILE);
     if (helpFile.is_open()) {
       std::string line;
       while (std::getline(helpFile, line)) {
@@ -16,4 +16,4 @@ namespace HelpMessage {
       std::cerr << "Error: Unable to open help message file." << std::endl;
     }
   }
-}
+}  // namespace HelpMessage
