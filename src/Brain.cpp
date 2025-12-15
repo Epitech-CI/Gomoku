@@ -69,6 +69,21 @@ void Brain::Brain::handleTurn(const std::string &payload) {
         << std::endl;
     return;
   }
+  command[command.find(',')] = ' ';
+  std::stringstream ss(command);
+  int x, y;
+  try {
+    ss >> x >> y;
+    if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize) {
+      std::cerr << "Invalid move coordinates: (" << x << ", " << y << ")"
+                << std::endl;
+      return;
+    }
+  } catch (...) {
+    std::cerr << "Error parsing TURN command payload: " << command << std::endl;
+    return;
+  }
+  std::cout << "Opponent played at: (" << x << ", " << y << ")" << std::endl;
 }
 
 void Brain::Brain::handleBegin(const std::string &payload) {
