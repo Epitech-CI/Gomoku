@@ -4,6 +4,14 @@
 #include <string>
 #include "Constants.hpp"
 
+/**
+ * @brief Initializes the Brain instance and starts the input handling thread.
+ *
+ * This function sets up the command map, marks the engine as running,
+ * and launches the main input loop in a separate thread.
+ *
+ * @return int SUCCESS status code.
+ */
 int Brain::Brain::start() {
   initializeCommands();
   _running = true;
@@ -11,6 +19,14 @@ int Brain::Brain::start() {
   return Constants::SUCCESS;
 }
 
+/**
+ * @brief Stops the Brain execution.
+ *
+ * Stops the running loop and joins the input thread if it is joinable,
+ * ensuring a clean shutdown.
+ *
+ * @return int SUCCESS status code.
+ */
 int Brain::Brain::stop() {
   _running = false;
   if (_inputHandler.joinable())
@@ -18,6 +34,15 @@ int Brain::Brain::stop() {
   return Constants::SUCCESS;
 }
 
+/**
+ * @brief Main loop for handling standard input.
+ *
+ * Continuously reads lines from std::cin. It matches the beginning of the
+ * line against registered commands and dispatches the payload to the
+ * appropriate handler function.
+ *
+ * @return int SUCCESS status code.
+ */
 int Brain::Brain::inputHandler() {
   std::string data;
   _running = true;
@@ -38,6 +63,14 @@ int Brain::Brain::inputHandler() {
   return Constants::SUCCESS;
 }
 
+/**
+ * @brief Handles the START command to initialize the board.
+ *
+ * Parses the board size requested by the manager. If valid, resizes the
+ * internal goban representation.
+ *
+ * @param payload The string containing the board size argument.
+ */
 void Brain::Brain::handleStart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -62,6 +95,14 @@ void Brain::Brain::handleStart(const std::string &payload) {
   std::cout << "Game started with board size: " << _boardSize << std::endl;
 }
 
+/**
+ * @brief Handles the TURN command (opponent's move).
+ *
+ * Parses the X and Y coordinates played by the opponent and updates the
+ * internal board state with '2' (indicating the opponent's piece).
+ *
+ * @param payload The string containing coordinates "X,Y".
+ */
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -88,6 +129,13 @@ void Brain::Brain::handleTurn(const std::string &payload) {
   std::cout << "Opponent played at: (" << x << ", " << y << ")" << std::endl;
 }
 
+/**
+ * @brief Handles the BEGIN command.
+ *
+ * Signals that the engine should make the first move.
+ *
+ * @param payload Command payload (usually empty).
+ */
 void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -109,6 +157,14 @@ void Brain::Brain::handleBoard(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Handles the INFO command to update game settings.
+ *
+ * Parses key-value pairs regarding time limits, memory, rules, etc.,
+ * and updates the internal info configuration.
+ *
+ * @param payload The string containing the key and value.
+ */
 void Brain::Brain::handleInfo(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -120,44 +176,51 @@ void Brain::Brain::handleInfo(const std::string &payload) {
   std::stringstream ss(command);
   std::string key;
   int value;
+
   try {
-    ss >> key >> value;
-    std::cout << "INFO command received: " << key << " = " << value
-              << std::endl;
+    ss >> key;
+
     if (info.checkKeyExists(key) == false) {
       std::cerr << "Unknown INFO key: " << key << std::endl;
       return;
     }
-    if (key == "timeout_turn") {
-      info.setTimeoutTurn(value);
-    } else if (key == "timeout_match") {
-      info.setTimeoutMatch(value);
-    } else if (key == "max_memory") {
-      info.setMaxMemory(value);
-    } else if (key == "time_left") {
-      info.setTimeLeft(value);
-    } else if (key == "game_type") {
-      info.setGameType(value);
-    } else if (key == "rule") {
-      info.setRule(static_cast<char>(value));
-    } else if (key == "evaluate") {
-      int x = value;
-      int y;
-      ss >> y;
+    if (key == "evaluate") {
+      int x, y;
+      ss >> x >> y;
       info.setEvaluate(std::make_pair(x, y));
     } else if (key == "folder") {
       std::string folder;
       ss >> folder;
       info.setFolder(folder);
+    } else {
+      ss >> value;
+      if (key == "timeout_turn")
+        info.setTimeoutTurn(value);
+      else if (key == "timeout_match")
+        info.setTimeoutMatch(value);
+      else if (key == "max_memory")
+        info.setMaxMemory(value);
+      else if (key == "time_left")
+        info.setTimeLeft(value);
+      else if (key == "game_type")
+        info.setGameType(value);
+      else if (key == "rule")
+        info.setRule(static_cast<char>(value));
     }
   } catch (...) {
-    std::cerr << "Error parsing INFO command payload: " << command
-              << std::endl;
+    std::cerr << "Error parsing INFO command payload: " << command << std::endl;
     return;
   }
-  
 }
 
+/**
+ * @brief Handles the END command.
+ *
+ * Sets the running flag to false to exit the main loop and terminate the
+ * engine.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleEnd(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -169,6 +232,13 @@ void Brain::Brain::handleEnd(const std::string &payload) {
   _running = false;
 }
 
+/**
+ * @brief Handles the ABOUT command.
+ *
+ * Reads from the ABOUT.txt file and prints the engine information to stdout.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleAbout(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -203,18 +273,43 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
 void Brain::Brain::handleRestart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "RESTART command received with empty payload or missing terminators."
-        << std::endl;
+    std::cerr << "RESTART command received with empty payload or missing "
+                 "terminators."
+              << std::endl;
     return;
   }
 }
 
+/**
+ * @brief Handles the TAKEBACK command.
+ *
+ * Reverts a move at the specified coordinates by setting the board cell back
+ * to '0'. Note: The logic for this was recovered from the mangled handlePlay
+ * function.
+ *
+ * @param payload Coordinates of the move to take back "X,Y".
+ */
 void Brain::Brain::handleTakeback(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
     std::cerr << "TAKEBACK command received with empty payload or missing "
                  "terminators."
+              << std::endl;
+    return;
+  }
+
+  std::stringstream ss(command);
+  int x, y;
+  try {
+    ss >> x >> y;
+    if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize) {
+      std::cerr << "Invalid takeback coordinates: (" << x << ", " << y << ")"
+                << std::endl;
+      return;
+    }
+    _goban[y * _boardSize + x] = '0';
+  } catch (...) {
+    std::cerr << "Error parsing TAKEBACK command payload: " << command
               << std::endl;
     return;
   }
@@ -253,9 +348,9 @@ void Brain::Brain::handleError(const std::string &payload) {
 void Brain::Brain::handleUnknown(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "UNKNOWN command received with empty payload or missing terminators."
-        << std::endl;
+    std::cerr << "UNKNOWN command received with empty payload or missing "
+                 "terminators."
+              << std::endl;
     return;
   }
 }
@@ -263,9 +358,9 @@ void Brain::Brain::handleUnknown(const std::string &payload) {
 void Brain::Brain::handleMessage(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "MESSAGE command received with empty payload or missing terminators."
-        << std::endl;
+    std::cerr << "MESSAGE command received with empty payload or missing "
+                 "terminators."
+              << std::endl;
     return;
   }
 }
@@ -283,13 +378,20 @@ void Brain::Brain::handleDebug(const std::string &payload) {
 void Brain::Brain::handleSuggest(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "SUGGEST command received with empty payload or missing terminators."
-        << std::endl;
+    std::cerr << "SUGGEST command received with empty payload or missing "
+                 "terminators."
+              << std::endl;
     return;
   }
 }
 
+/**
+ * @brief Registers all supported commands to their respective handler
+ * functions.
+ *
+ * Uses lambdas to bind member functions to the string command keys in the
+ * _commands map.
+ */
 void Brain::Brain::initializeCommands() {
   _commands["START"] = [this](const std::string &p) { this->handleStart(p); };
   _commands["TURN"] = [this](const std::string &p) { this->handleTurn(p); };
@@ -324,6 +426,16 @@ void Brain::Brain::initializeCommands() {
   };
 }
 
+/**
+ * @brief Checks and strips the command terminator (CR/LF).
+ *
+ * Verifies if the payload ends with a valid terminator (\r or \n).
+ * If valid, it strips the terminator from the string.
+ *
+ * @param payload The command string to check and modify.
+ * @return true If a valid terminator was found and removed.
+ * @return false If no terminator was found.
+ */
 bool Brain::Brain::checkTerminator(std::string &payload) {
   if (payload[payload.size() - 1] == 0x0d ||
       payload[payload.size() - 1] == 0x0a) {
