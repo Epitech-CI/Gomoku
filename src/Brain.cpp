@@ -53,6 +53,7 @@ void Brain::Brain::handleStart(const std::string &payload) {
       std::cerr << "Invalid board size: " << _boardSize << std::endl;
       return;
     }
+    _goban.resize(_boardSize * _boardSize, '0');
   } catch (...) {
     std::cerr << "Error parsing START command payload: " << command
               << std::endl;
@@ -79,6 +80,7 @@ void Brain::Brain::handleTurn(const std::string &payload) {
                 << std::endl;
       return;
     }
+    _goban[y * _boardSize + x] = '2';
   } catch (...) {
     std::cerr << "Error parsing TURN command payload: " << command << std::endl;
     return;

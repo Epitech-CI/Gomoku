@@ -42,6 +42,7 @@ namespace Brain {
 
     private:
       int _boardSize{0};
+      std::vector<char> _goban;
       std::thread _inputHandler;
       std::atomic<bool> _running{false};
       std::unordered_map<std::string,
