@@ -1,0 +1,6 @@
+usage: pbrain-gomoku-ai [-h | --help]
+
+flags:
+  [-h | --help]: Show help message
+
+Warning: this project doesn't need any flags
