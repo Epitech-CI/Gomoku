@@ -117,6 +117,45 @@ void Brain::Brain::handleInfo(const std::string &payload) {
         << std::endl;
     return;
   }
+  std::stringstream ss(command);
+  std::string key;
+  int value;
+  try {
+    ss >> key >> value;
+    std::cout << "INFO command received: " << key << " = " << value
+              << std::endl;
+    if (info.checkKeyExists(key) == false) {
+      std::cerr << "Unknown INFO key: " << key << std::endl;
+      return;
+    }
+    if (key == "timeout_turn") {
+      info.setTimeoutTurn(value);
+    } else if (key == "timeout_match") {
+      info.setTimeoutMatch(value);
+    } else if (key == "max_memory") {
+      info.setMaxMemory(value);
+    } else if (key == "time_left") {
+      info.setTimeLeft(value);
+    } else if (key == "game_type") {
+      info.setGameType(value);
+    } else if (key == "rule") {
+      info.setRule(static_cast<char>(value));
+    } else if (key == "evaluate") {
+      int x = value;
+      int y;
+      ss >> y;
+      info.setEvaluate(std::make_pair(x, y));
+    } else if (key == "folder") {
+      std::string folder;
+      ss >> folder;
+      info.setFolder(folder);
+    }
+  } catch (...) {
+    std::cerr << "Error parsing INFO command payload: " << command
+              << std::endl;
+    return;
+  }
+  
 }
 
 void Brain::Brain::handleEnd(const std::string &payload) {
@@ -139,7 +178,7 @@ void Brain::Brain::handleAbout(const std::string &payload) {
     return;
   }
 
-  std::ifstream aboutFile("./src/ABOUT.txt");
+  std::ifstream aboutFile(Constants::ABOUT_FILE);
   if (aboutFile.is_open()) {
     std::string line;
     while (std::getline(aboutFile, line)) {
