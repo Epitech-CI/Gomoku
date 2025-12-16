@@ -16,7 +16,7 @@ int Brain::Brain::start() {
   initializeCommands();
   _running = true;
   _inputHandler = std::thread(&Brain::Brain::inputHandler, this);
-  return Constants::SUCCESS;
+  return logicLoop();
 }
 
 /**
@@ -31,6 +31,29 @@ int Brain::Brain::stop() {
   _running = false;
   if (_inputHandler.joinable())
     _inputHandler.join();
+  return Constants::SUCCESS;
+}
+
+int Brain::Brain::logicLoop() {
+  while (_running) {
+    std::string payload;
+    {
+      std::unique_lock<std::mutex> lock(_queueMutex);
+      _cv.wait(lock, [this] { return !_commandQueue.empty() || !_running; });
+      if (!_running)
+        break;
+      payload = _commandQueue.front();
+      _commandQueue.pop();
+    }
+    if (payload.empty())
+      continue;
+    for (const auto &command : _commands) {
+      if (payload.find(command.first) == 0) {
+        std::string commandPayload = payload.substr(command.first.size());
+        command.second(commandPayload);
+      }
+    }
+  }
   return Constants::SUCCESS;
 }
 
@@ -49,18 +72,26 @@ int Brain::Brain::inputHandler() {
 
   while (_running) {
     std::getline(std::cin, data);
-    if (data.empty()) {
-      continue;
+    {
+      std::lock_guard<std::mutex> lock(_queueMutex);
+      _commandQueue.push(data);
     }
-    for (const auto &command : _commands) {
-      if (data.find(command.first) == 0) {
-        std::string payload = data.substr(command.first.size());
-        command.second(payload);
-        break;
-      }
-    }
+    _cv.notify_one();
   }
   return Constants::SUCCESS;
+}
+
+void Brain::Brain::sendResponse(const std::string &response) {
+  std::lock_guard<std::mutex> lock(_responseMutex);
+  std::cout << response << std::endl;
+}
+
+void Brain::Brain::sendOk() {
+  sendResponse("OK");
+}
+
+void Brain::Brain::sendError(const std::string &errorMessage) {
+  sendResponse("ERROR " + errorMessage);
 }
 
 /**
@@ -85,6 +116,7 @@ void Brain::Brain::handleStart(const std::string &payload) {
     ss >> boardSize;
     if (boardSize < Constants::MIN_BOARD_SIZE) {
       std::cerr << "Invalid board size: " << boardSize << std::endl;
+      sendError("Invalid board size");
       return;
     }
     _boardSize = std::make_pair(boardSize, boardSize);
@@ -92,8 +124,10 @@ void Brain::Brain::handleStart(const std::string &payload) {
   } catch (...) {
     std::cerr << "Error parsing START command payload: " << command
               << std::endl;
+    sendError("Error parsing board size");
     return;
   }
+  sendOk();
   std::cout << "Game started with board size: " << _boardSize.first << "x"
             << _boardSize.second << std::endl;
 }
