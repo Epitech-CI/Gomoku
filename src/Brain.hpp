@@ -44,7 +44,7 @@ namespace Brain {
 
     private:
       Info info;
-      int _boardSize{0};
+      std::pair<int, int> _boardSize{0, 0};
       std::vector<char> _goban;
       std::thread _inputHandler;
       std::atomic<bool> _running{false};
