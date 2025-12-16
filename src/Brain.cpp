@@ -333,6 +333,7 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
     sendError("Error parsing RECSTART command payload");
     return;
   }
+  sendOk();
   sendDebug("Game started with board size: " +
                  std::to_string(_boardSize.first) + "x" +
                  std::to_string(_boardSize.second));
