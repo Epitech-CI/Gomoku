@@ -47,6 +47,9 @@ namespace Brain {
       void sendResponse(const std::string &response);
       void sendOk();
       void sendError(const std::string &errorMessage);
+      void sendUnknown(const std::string &message);
+      void sendMessage(const std::string &message);
+      void sendDebug(const std::string &debugInfo);
 
     private:
       Info info;
