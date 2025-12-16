@@ -37,6 +37,7 @@ int Brain::Brain::stop() {
 int Brain::Brain::logicLoop() {
   while (_running) {
     std::string payload;
+    bool doesMessageExist = false;
     {
       std::unique_lock<std::mutex> lock(_queueMutex);
       _cv.wait(lock, [this] { return !_commandQueue.empty() || !_running; });
@@ -51,7 +52,12 @@ int Brain::Brain::logicLoop() {
       if (payload.find(command.first) == 0) {
         std::string commandPayload = payload.substr(command.first.size());
         command.second(commandPayload);
+        doesMessageExist = true;
+        break;
       }
+    }
+    if (!doesMessageExist) {
+      sendUnknown(payload);
     }
   }
   return Constants::SUCCESS;
@@ -94,6 +100,18 @@ void Brain::Brain::sendError(const std::string &errorMessage) {
   sendResponse("ERROR " + errorMessage);
 }
 
+void Brain::Brain::sendUnknown(const std::string &message) {
+  sendResponse("UNKNOWN " + message);
+}
+
+void Brain::Brain::sendMessage(const std::string &message) {
+  sendResponse("MESSAGE " + message);
+}
+
+void Brain::Brain::sendDebug(const std::string &debugInfo) {
+  sendResponse("DEBUG " + debugInfo);
+}
+
 /**
  * @brief Handles the START command to initialize the board.
  *
@@ -105,9 +123,7 @@ void Brain::Brain::sendError(const std::string &errorMessage) {
 void Brain::Brain::handleStart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "START command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("START command received with empty payload or missing terminators.");
     return;
   }
   std::stringstream ss(command);
@@ -115,21 +131,19 @@ void Brain::Brain::handleStart(const std::string &payload) {
   try {
     ss >> boardSize;
     if (boardSize < Constants::MIN_BOARD_SIZE) {
-      std::cerr << "Invalid board size: " << boardSize << std::endl;
-      sendError("Invalid board size");
+      sendError("Invalid board size: " + std::to_string(boardSize));
       return;
     }
     _boardSize = std::make_pair(boardSize, boardSize);
     _goban.resize(boardSize * boardSize, '0');
   } catch (...) {
-    std::cerr << "Error parsing START command payload: " << command
-              << std::endl;
-    sendError("Error parsing board size");
+    sendError("Error parsing START command payload: " + command);
     return;
   }
   sendOk();
-  std::cout << "Game started with board size: " << _boardSize.first << "x"
-            << _boardSize.second << std::endl;
+  sendDebug("Game started with board size: " +
+                 std::to_string(_boardSize.first) + "x" +
+                 std::to_string(_boardSize.second));
 }
 
 /**
@@ -143,9 +157,7 @@ void Brain::Brain::handleStart(const std::string &payload) {
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "TURN command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("TURN command received with empty payload or missing terminators.");
     return;
   }
   command[command.find(',')] = ' ';
@@ -154,16 +166,17 @@ void Brain::Brain::handleTurn(const std::string &payload) {
   try {
     ss >> x >> y;
     if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
-      std::cerr << "Invalid move coordinates: (" << x << ", " << y << ")"
-                << std::endl;
+      sendError("Invalid move coordinates: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
       return;
     }
     _goban[y * _boardSize.first + x] = '2';
   } catch (...) {
-    std::cerr << "Error parsing TURN command payload: " << command << std::endl;
+    sendError("Error parsing TURN command payload");
     return;
   }
-  std::cout << "Opponent played at: (" << x << ", " << y << ")" << std::endl;
+  sendDebug("Opponent played at: (" + std::to_string(x) + ", " +
+                 std::to_string(y) + ")");
+  // TO DO: Implement AI move calculation and respond with the move
 }
 
 /**
@@ -176,9 +189,7 @@ void Brain::Brain::handleTurn(const std::string &payload) {
 void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "BEGIN command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("BEGIN command received with empty payload or missing terminators.");
     return;
   }
   // TO DO: Choose a move and update _goban accordingly
@@ -187,9 +198,7 @@ void Brain::Brain::handleBegin(const std::string &payload) {
 void Brain::Brain::handleBoard(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "BOARD command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("BOARD command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -217,7 +226,7 @@ void Brain::Brain::handleInfo(const std::string &payload) {
   try {
     ss >> key;
     if (info.checkKeyExists(key) == false) {
-      std::cerr << "Unknown INFO key: " << key << std::endl;
+      sendError("Unknown INFO key: " + key);
       return;
     }
     if (key == "evaluate") {
@@ -244,7 +253,7 @@ void Brain::Brain::handleInfo(const std::string &payload) {
         info.setRule(static_cast<char>(value));
     }
   } catch (...) {
-    std::cerr << "Error parsing INFO command payload: " << command << std::endl;
+    sendError("Error parsing INFO command payload");
     return;
   }
 }
@@ -260,9 +269,7 @@ void Brain::Brain::handleInfo(const std::string &payload) {
 void Brain::Brain::handleEnd(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "END command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("END command received with empty payload or missing terminators.");
     return;
   }
   _running = false;
@@ -278,9 +285,7 @@ void Brain::Brain::handleEnd(const std::string &payload) {
 void Brain::Brain::handleAbout(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "ABOUT command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("ABOUT command received with empty payload or missing terminators.");
     return;
   }
 
@@ -292,7 +297,7 @@ void Brain::Brain::handleAbout(const std::string &payload) {
     }
     aboutFile.close();
   } else {
-    std::cerr << "Error: Unable to open help message file." << std::endl;
+    sendDebug("Unable to open ABOUT file");
   }
 }
 
@@ -309,9 +314,7 @@ void Brain::Brain::handleAbout(const std::string &payload) {
 void Brain::Brain::handleRecstart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "RECSTART command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("RECSTART command received with empty payload or missing terminators.");
     return;
   }
   command[command.find(',')] = ' ';
@@ -321,30 +324,33 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
     ss >> width >> height;
     if (width < Constants::MIN_BOARD_SIZE ||
         height < Constants::MIN_BOARD_SIZE) {
-      std::cerr << "Invalid move coordinates: (" << width << ", " << height
-                << ")" << std::endl;
+      sendError("Invalid move coordinates: (" + std::to_string(width) + ", " + std::to_string(height) + ")");
       return;
     }
     _boardSize = std::make_pair(width, height);
     _goban.resize(_boardSize.first * _boardSize.second, '0');
   } catch (...) {
-    std::cerr << "Error parsing TURN command payload: " << command << std::endl;
+    sendError("Error parsing RECSTART command payload");
     return;
   }
-  std::cout << "Game started with board size: " << _boardSize.first << "x"
-            << _boardSize.second << std::endl;
+  sendDebug("Game started with board size: " +
+                 std::to_string(_boardSize.first) + "x" +
+                 std::to_string(_boardSize.second));
 }
 
 void Brain::Brain::handleRestart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "RESTART command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("RESTART command received with empty payload or missing terminators.");
     return;
   }
-  std::fill(_goban.begin(), _goban.end(), '0');
-  // TO DO: Reply "OK" to the manager
+  try {
+    std::fill(_goban.begin(), _goban.end(), '0');
+  } catch (...) {
+    sendError("Error resetting the board on RESTART command");
+    return;
+  }
+  sendOk();
 }
 
 /**
@@ -359,9 +365,7 @@ void Brain::Brain::handleRestart(const std::string &payload) {
 void Brain::Brain::handleTakeback(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "TAKEBACK command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("TAKEBACK command received with empty payload or missing terminators.");
     return;
   }
 
@@ -370,14 +374,12 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
   try {
     ss >> x >> y;
     if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
-      std::cerr << "Invalid takeback coordinates: (" << x << ", " << y << ")"
-                << std::endl;
+      sendError("Invalid takeback coordinates: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
       return;
     }
     _goban[y * _boardSize.first + x] = '0';
   } catch (...) {
-    std::cerr << "Error parsing TAKEBACK command payload: " << command
-              << std::endl;
+    sendError("Error parsing TAKEBACK command payload: " + command);
     return;
   }
 }
@@ -385,9 +387,7 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 void Brain::Brain::handlePlay(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "PLAY command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("PLAY command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -395,9 +395,7 @@ void Brain::Brain::handlePlay(const std::string &payload) {
 void Brain::Brain::handleSwap2Board(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "SWAP2BOARD command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("SWAP2BOARD command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -405,9 +403,7 @@ void Brain::Brain::handleSwap2Board(const std::string &payload) {
 void Brain::Brain::handleError(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "ERROR command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("ERROR command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -415,9 +411,7 @@ void Brain::Brain::handleError(const std::string &payload) {
 void Brain::Brain::handleUnknown(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "UNKNOWN command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("UNKNOWN command received with empty payload or missing terminators."); 
     return;
   }
 }
@@ -425,9 +419,7 @@ void Brain::Brain::handleUnknown(const std::string &payload) {
 void Brain::Brain::handleMessage(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "MESSAGE command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("MESSAGE command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -435,9 +427,7 @@ void Brain::Brain::handleMessage(const std::string &payload) {
 void Brain::Brain::handleDebug(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "DEBUG command received with empty payload or missing terminators."
-        << std::endl;
+    sendError("DEBUG command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -445,9 +435,7 @@ void Brain::Brain::handleDebug(const std::string &payload) {
 void Brain::Brain::handleSuggest(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr << "SUGGEST command received with empty payload or missing "
-                 "terminators."
-              << std::endl;
+    sendError("SUGGEST command received with empty payload or missing terminators.");
     return;
   }
 }
