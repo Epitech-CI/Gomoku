@@ -80,19 +80,22 @@ void Brain::Brain::handleStart(const std::string &payload) {
     return;
   }
   std::stringstream ss(command);
+  int boardSize;
   try {
-    ss >> _boardSize;
-    if (_boardSize < Constants::MIN_BOARD_SIZE) {
-      std::cerr << "Invalid board size: " << _boardSize << std::endl;
+    ss >> boardSize;
+    if (boardSize < Constants::MIN_BOARD_SIZE) {
+      std::cerr << "Invalid board size: " << boardSize << std::endl;
       return;
     }
-    _goban.resize(_boardSize * _boardSize, '0');
+    _boardSize = std::make_pair(boardSize, boardSize);
+    _goban.resize(boardSize * boardSize, '0');
   } catch (...) {
     std::cerr << "Error parsing START command payload: " << command
               << std::endl;
     return;
   }
-  std::cout << "Game started with board size: " << _boardSize << std::endl;
+  std::cout << "Game started with board size: " << _boardSize.first << "x"
+            << _boardSize.second << std::endl;
 }
 
 /**
@@ -116,12 +119,12 @@ void Brain::Brain::handleTurn(const std::string &payload) {
   int x, y;
   try {
     ss >> x >> y;
-    if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize) {
+    if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
       std::cerr << "Invalid move coordinates: (" << x << ", " << y << ")"
                 << std::endl;
       return;
     }
-    _goban[y * _boardSize + x] = '2';
+    _goban[y * _boardSize.first + x] = '2';
   } catch (...) {
     std::cerr << "Error parsing TURN command payload: " << command << std::endl;
     return;
@@ -179,7 +182,6 @@ void Brain::Brain::handleInfo(const std::string &payload) {
 
   try {
     ss >> key;
-
     if (info.checkKeyExists(key) == false) {
       std::cerr << "Unknown INFO key: " << key << std::endl;
       return;
@@ -260,6 +262,16 @@ void Brain::Brain::handleAbout(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Handles the RECSTART command for rectangular boards.
+ *
+ * Parses the width and height from the payload (handling comma separation).
+ * Validates the dimensions against the minimum board size. If valid, updates
+ * the internal board dimensions and resizes the goban vector to fit
+ * the new rectangular configuration.
+ *
+ * @param payload The string containing the dimensions (e.g., "width,height").
+ */
 void Brain::Brain::handleRecstart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -268,6 +280,25 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
               << std::endl;
     return;
   }
+  command[command.find(',')] = ' ';
+  std::stringstream ss(command);
+  int width, height;
+  try {
+    ss >> width >> height;
+    if (width < Constants::MIN_BOARD_SIZE ||
+        height < Constants::MIN_BOARD_SIZE) {
+      std::cerr << "Invalid move coordinates: (" << width << ", " << height
+                << ")" << std::endl;
+      return;
+    }
+    _boardSize = std::make_pair(width, height);
+    _goban.resize(_boardSize.first * _boardSize.second, '0');
+  } catch (...) {
+    std::cerr << "Error parsing TURN command payload: " << command << std::endl;
+    return;
+  }
+  std::cout << "Game started with board size: " << _boardSize.first << "x"
+            << _boardSize.second << std::endl;
 }
 
 void Brain::Brain::handleRestart(const std::string &payload) {
@@ -278,6 +309,8 @@ void Brain::Brain::handleRestart(const std::string &payload) {
               << std::endl;
     return;
   }
+  std::fill(_goban.begin(), _goban.end(), '0');
+  // TO DO: Reply "OK" to the manager
 }
 
 /**
@@ -302,12 +335,12 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
   int x, y;
   try {
     ss >> x >> y;
-    if (x < 0 || x >= _boardSize || y < 0 || y >= _boardSize) {
+    if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
       std::cerr << "Invalid takeback coordinates: (" << x << ", " << y << ")"
                 << std::endl;
       return;
     }
-    _goban[y * _boardSize + x] = '0';
+    _goban[y * _boardSize.first + x] = '0';
   } catch (...) {
     std::cerr << "Error parsing TAKEBACK command payload: " << command
               << std::endl;
