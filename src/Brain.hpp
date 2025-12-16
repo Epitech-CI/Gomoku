@@ -41,6 +41,12 @@ namespace Brain {
 
       // Multi-threading process
       int inputHandler();
+      int logicLoop();
+
+      // Logic responses
+      void sendResponse(const std::string &response);
+      void sendOk();
+      void sendError(const std::string &errorMessage);
 
     private:
       Info info;
@@ -51,5 +57,9 @@ namespace Brain {
       std::unordered_map<std::string,
                          std::function<void(const std::string &payload)>>
           _commands;
+      std::queue<std::string> _commandQueue;
+      std::mutex _queueMutex;
+      std::mutex _responseMutex;
+      std::condition_variable _cv;
   };
 }  // namespace Brain
