@@ -3,3 +3,4 @@ cmake-build-debug
 pbrain-gomoku-ai
 .idea
 compile_commands.json
+test.py

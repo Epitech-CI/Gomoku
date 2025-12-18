@@ -48,9 +48,21 @@ int Brain::Brain::logicLoop() {
     }
     if (payload.empty())
       continue;
+    if (payload.find("DONE") == 0) {
+      boardIsActivated = false;
+    }
+    if (boardIsActivated) {
+      handleBoard(payload);
+      continue;
+    }
     for (const auto &command : _commands) {
       if (payload.find(command.first) == 0) {
         std::string commandPayload = payload.substr(command.first.size());
+        if (command.first == "BOARD") {
+          boardIsActivated = true;
+          doesMessageExist = true;
+          break;
+        }
         command.second(commandPayload);
         doesMessageExist = true;
         break;
@@ -112,6 +124,15 @@ void Brain::Brain::sendDebug(const std::string &debugInfo) {
   sendResponse("DEBUG " + debugInfo);
 }
 
+void Brain::Brain::sendCoordinate(int x, int y) {
+  // Sécurité : n'envoie pas de coordonnées négatives
+  if (x < 0 || y < 0) {
+    sendError("No valid move found (minimax returned negative index)");
+    return;
+  }
+  sendResponse(std::to_string(x) + "," + std::to_string(y));
+}
+
 /**
  * @brief Handles the START command to initialize the board.
  *
@@ -123,7 +144,8 @@ void Brain::Brain::sendDebug(const std::string &debugInfo) {
 void Brain::Brain::handleStart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("START command received with empty payload or missing terminators.");
+    sendError(
+        "START command received with empty payload or missing terminators.");
     return;
   }
   std::stringstream ss(command);
@@ -135,15 +157,12 @@ void Brain::Brain::handleStart(const std::string &payload) {
       return;
     }
     _boardSize = std::make_pair(boardSize, boardSize);
-    _goban.resize(boardSize * boardSize, '0');
+    _goban.resize(boardSize * boardSize, 0);
   } catch (...) {
     sendError("Error parsing START command payload: " + command);
     return;
   }
   sendOk();
-  sendDebug("Game started with board size: " +
-                 std::to_string(_boardSize.first) + "x" +
-                 std::to_string(_boardSize.second));
 }
 
 /**
@@ -157,7 +176,8 @@ void Brain::Brain::handleStart(const std::string &payload) {
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("TURN command received with empty payload or missing terminators.");
+    sendError(
+        "TURN command received with empty payload or missing terminators.");
     return;
   }
   command[command.find(',')] = ' ';
@@ -166,17 +186,19 @@ void Brain::Brain::handleTurn(const std::string &payload) {
   try {
     ss >> x >> y;
     if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
-      sendError("Invalid move coordinates: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
+      sendError("Invalid move coordinates: (" + std::to_string(x) + ", " +
+                std::to_string(y) + ")");
       return;
     }
-    _goban[y * _boardSize.first + x] = '2';
+    _goban[y * _boardSize.first + x] = 2;
   } catch (...) {
     sendError("Error parsing TURN command payload");
     return;
   }
-  sendDebug("Opponent played at: (" + std::to_string(x) + ", " +
-                 std::to_string(y) + ")");
-  // TO DO: Implement AI move calculation and respond with the move
+  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
+                        std::numeric_limits<int>::max());
+  sendCoordinate(result.second % _boardSize.first,
+                 result.second / _boardSize.first);
 }
 
 /**
@@ -189,7 +211,8 @@ void Brain::Brain::handleTurn(const std::string &payload) {
 void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("BEGIN command received with empty payload or missing terminators.");
+    sendError(
+        "BEGIN command received with empty payload or missing terminators.");
     return;
   }
   // TO DO: Choose a move and update _goban accordingly
@@ -198,9 +221,37 @@ void Brain::Brain::handleBegin(const std::string &payload) {
 void Brain::Brain::handleBoard(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("BOARD command received with empty payload or missing terminators.");
+    sendError(
+        "BOARD command received with empty payload or missing terminators.");
     return;
   }
+  for (char &ch : command) {
+    if (ch == ',') {
+      ch = ' ';
+    }
+  }
+  std::stringstream ss(command);
+  int x, y, player;
+  ss >> x >> y >> player;
+  if (x < 0 || x >= _boardSize.first || y < 0 ||
+      y >= _boardSize.second) {
+    sendError("Invalid BOARD coordinates: (" + std::to_string(x) + ", " +
+              std::to_string(y) + ")");
+    return;
+  }
+  if (player == 3) {
+    sendError("Invalid player number in BOARD command: " +
+              std::to_string(player));
+    return;
+  }
+  _goban[y * _boardSize.first + x] = player;
+  for (int i = 0; i < _boardSize.first; i++) {
+    for (int j = 0; j < _boardSize.second; j++) {
+      std::cerr << _goban[i * _boardSize.first + j] << " ";
+    }
+    std::cerr << std::endl;
+  }
+  std::cerr << "----" << std::endl;
 }
 
 /**
@@ -269,7 +320,8 @@ void Brain::Brain::handleInfo(const std::string &payload) {
 void Brain::Brain::handleEnd(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("END command received with empty payload or missing terminators.");
+    sendError(
+        "END command received with empty payload or missing terminators.");
     return;
   }
   _running = false;
@@ -285,7 +337,8 @@ void Brain::Brain::handleEnd(const std::string &payload) {
 void Brain::Brain::handleAbout(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("ABOUT command received with empty payload or missing terminators.");
+    sendError(
+        "ABOUT command received with empty payload or missing terminators.");
     return;
   }
 
@@ -314,7 +367,8 @@ void Brain::Brain::handleAbout(const std::string &payload) {
 void Brain::Brain::handleRecstart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("RECSTART command received with empty payload or missing terminators.");
+    sendError(
+        "RECSTART command received with empty payload or missing terminators.");
     return;
   }
   command[command.find(',')] = ' ';
@@ -324,29 +378,31 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
     ss >> width >> height;
     if (width < Constants::MIN_BOARD_SIZE ||
         height < Constants::MIN_BOARD_SIZE) {
-      sendError("Invalid move coordinates: (" + std::to_string(width) + ", " + std::to_string(height) + ")");
+      sendError("Invalid move coordinates: (" + std::to_string(width) + ", " +
+                std::to_string(height) + ")");
       return;
     }
     _boardSize = std::make_pair(width, height);
-    _goban.resize(_boardSize.first * _boardSize.second, '0');
+    _goban.resize(_boardSize.first * _boardSize.second, 0);
   } catch (...) {
     sendError("Error parsing RECSTART command payload");
     return;
   }
   sendOk();
-  sendDebug("Game started with board size: " +
-                 std::to_string(_boardSize.first) + "x" +
-                 std::to_string(_boardSize.second));
+  sendDebug(
+      "Game started with board size: " + std::to_string(_boardSize.first) +
+      "x" + std::to_string(_boardSize.second));
 }
 
 void Brain::Brain::handleRestart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("RESTART command received with empty payload or missing terminators.");
+    sendError(
+        "RESTART command received with empty payload or missing terminators.");
     return;
   }
   try {
-    std::fill(_goban.begin(), _goban.end(), '0');
+    std::fill(_goban.begin(), _goban.end(), 0);
   } catch (...) {
     sendError("Error resetting the board on RESTART command");
     return;
@@ -366,7 +422,8 @@ void Brain::Brain::handleRestart(const std::string &payload) {
 void Brain::Brain::handleTakeback(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("TAKEBACK command received with empty payload or missing terminators.");
+    sendError(
+        "TAKEBACK command received with empty payload or missing terminators.");
     return;
   }
 
@@ -375,10 +432,11 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
   try {
     ss >> x >> y;
     if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
-      sendError("Invalid takeback coordinates: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
+      sendError("Invalid takeback coordinates: (" + std::to_string(x) + ", " +
+                std::to_string(y) + ")");
       return;
     }
-    _goban[y * _boardSize.first + x] = '0';
+    _goban[y * _boardSize.first + x] = 0;
   } catch (...) {
     sendError("Error parsing TAKEBACK command payload: " + command);
     return;
@@ -388,7 +446,8 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 void Brain::Brain::handlePlay(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("PLAY command received with empty payload or missing terminators.");
+    sendError(
+        "PLAY command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -396,7 +455,9 @@ void Brain::Brain::handlePlay(const std::string &payload) {
 void Brain::Brain::handleSwap2Board(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("SWAP2BOARD command received with empty payload or missing terminators.");
+    sendError(
+        "SWAP2BOARD command received with empty payload or missing "
+        "terminators.");
     return;
   }
 }
@@ -404,7 +465,8 @@ void Brain::Brain::handleSwap2Board(const std::string &payload) {
 void Brain::Brain::handleError(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("ERROR command received with empty payload or missing terminators.");
+    sendError(
+        "ERROR command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -412,7 +474,8 @@ void Brain::Brain::handleError(const std::string &payload) {
 void Brain::Brain::handleUnknown(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("UNKNOWN command received with empty payload or missing terminators."); 
+    sendError(
+        "UNKNOWN command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -420,7 +483,8 @@ void Brain::Brain::handleUnknown(const std::string &payload) {
 void Brain::Brain::handleMessage(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("MESSAGE command received with empty payload or missing terminators.");
+    sendError(
+        "MESSAGE command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -428,7 +492,8 @@ void Brain::Brain::handleMessage(const std::string &payload) {
 void Brain::Brain::handleDebug(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("DEBUG command received with empty payload or missing terminators.");
+    sendError(
+        "DEBUG command received with empty payload or missing terminators.");
     return;
   }
 }
@@ -436,9 +501,24 @@ void Brain::Brain::handleDebug(const std::string &payload) {
 void Brain::Brain::handleSuggest(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    sendError("SUGGEST command received with empty payload or missing terminators.");
+    sendError(
+        "SUGGEST command received with empty payload or missing terminators.");
     return;
   }
+}
+
+void Brain::Brain::handleDone(const std::string &payload) {
+  std::string command = payload;
+  if (checkTerminator(command) == false) {
+    sendError(
+        "DONE command received with empty payload or missing terminators.");
+    return;
+  }
+  boardIsActivated = false;
+  auto result = minimax(_goban, 5, true, std::numeric_limits<int>::min(),
+                        std::numeric_limits<int>::max());
+  sendCoordinate(result.second % _boardSize.first,
+                 result.second / _boardSize.first);
 }
 
 /**
@@ -453,6 +533,7 @@ void Brain::Brain::initializeCommands() {
   _commands["TURN"] = [this](const std::string &p) { this->handleTurn(p); };
   _commands["BEGIN"] = [this](const std::string &p) { this->handleBegin(p); };
   _commands["BOARD"] = [this](const std::string &p) { this->handleBoard(p); };
+  _commands["DONE"] = [this](const std::string &p) { this->handleDone(p); };
   _commands["INFO"] = [this](const std::string &p) { this->handleInfo(p); };
   _commands["END"] = [this](const std::string &p) { this->handleEnd(p); };
   _commands["ABOUT"] = [this](const std::string &p) { this->handleAbout(p); };
@@ -502,6 +583,159 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
       payload.clear();
     }
     return true;
+  }
+  return false;
+}
+
+std::pair<int, int> Brain::Brain::minimax(State state, int depth,
+                                          bool maximizingPlayer, int alpha,
+                                          int beta) {
+  if (checkWinCondition(state, 1)) {
+    return {PLAYER_ONE_WIN, 0};
+  } else if (checkWinCondition(state, 2)) {
+    return {PLAYER_TWO_WIN, 0};
+  } else if (depth == 0 || isBoardFull(state)) {
+    return {DRAW, 0};
+  }
+
+  int bestMoveFound = -1;
+
+  if (maximizingPlayer) {
+    int maxEval = std::numeric_limits<int>::min();
+    State possibleMoves = getPossibleMoves(state);
+    if (possibleMoves.empty()) {
+      return {DRAW, 0};
+    }
+    for (int move : possibleMoves) {
+      State newState = applyMove(state, move, 1);
+      int eval = minimax(newState, depth - 1, false, alpha, beta).first;
+      if (eval > maxEval) {
+        maxEval = eval;
+        bestMoveFound = move;
+      }
+      alpha = std::max(alpha, eval);
+      if (beta <= alpha) {
+        break;
+      }
+    }
+    if (bestMoveFound < 0 && !possibleMoves.empty())
+      bestMoveFound = possibleMoves[0];
+    return {maxEval, bestMoveFound};
+  } else {
+    int minEval = std::numeric_limits<int>::max();
+    State possibleMoves = getPossibleMoves(state);
+    if (possibleMoves.empty()) {
+      return {DRAW, 0};
+    }
+    for (int move : possibleMoves) {
+      State newState = applyMove(state, move, 2);
+      int eval = minimax(newState, depth - 1, true, alpha, beta).first;
+      if (eval < minEval) {
+        minEval = eval;
+        bestMoveFound = move;
+      }
+      beta = std::min(beta, eval);
+      if (beta <= alpha) {
+        break;
+      }
+    }
+    if (bestMoveFound < 0 && !possibleMoves.empty())
+      bestMoveFound = possibleMoves[0];
+    return {minEval, bestMoveFound};
+  }
+}
+
+bool Brain::Brain::isBoardFull(const State &state) {
+  for (int cell : state) {
+    if (cell == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool Brain::Brain::checkWinCondition(const State &state, int player) {
+  for (int i = 0; i < _boardSize.second; ++i) {
+    for (int j = 0; j < _boardSize.first; ++j) {
+      if (state[i * _boardSize.first + j] == player) {
+        if (j <= _boardSize.first - 5) {
+          if (state[i * _boardSize.first + j + 1] == player &&
+              state[i * _boardSize.first + j + 2] == player &&
+              state[i * _boardSize.first + j + 3] == player &&
+              state[i * _boardSize.first + j + 4] == player) {
+            return true;
+          }
+        }
+        if (i <= _boardSize.second - 5) {
+          if (state[(i + 1) * _boardSize.first + j] == player &&
+              state[(i + 2) * _boardSize.first + j] == player &&
+              state[(i + 3) * _boardSize.first + j] == player &&
+              state[(i + 4) * _boardSize.first + j] == player) {
+            return true;
+          }
+        }
+        if (i <= _boardSize.second - 5 && j <= _boardSize.first - 5) {
+          if (state[(i + 1) * _boardSize.first + j + 1] == player &&
+              state[(i + 2) * _boardSize.first + j + 2] == player &&
+              state[(i + 3) * _boardSize.first + j + 3] == player &&
+              state[(i + 4) * _boardSize.first + j + 4] == player) {
+            return true;
+          }
+        }
+        if (i >= 4 && j <= _boardSize.first - 5) {
+          if (state[(i - 1) * _boardSize.first + j + 1] == player &&
+              state[(i - 2) * _boardSize.first + j + 2] == player &&
+              state[(i - 3) * _boardSize.first + j + 3] == player &&
+              state[(i - 4) * _boardSize.first + j + 4] == player) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
+State Brain::Brain::applyMove(const State &state, int move, int player) {
+  State newState = state;
+  newState[move] = player;
+  return newState;
+}
+
+State Brain::Brain::getPossibleMoves(const State &state) {
+  State moves;
+  int proximity_range = 1;
+
+  for (int i = 0; i < state.size(); ++i) {
+    if (state[i] == 0) {
+      if (hasNeighbor(state, i, proximity_range)) {
+        moves.push_back(i);
+      }
+    }
+  }
+  if (moves.empty()) {
+    moves.push_back(state.size() / 2);
+  }
+  return moves;
+}
+
+bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
+  int x = index / _boardSize.first;
+  int y = index % _boardSize.first;
+
+  for (int dx = -range; dx <= range; ++dx) {
+    for (int dy = -range; dy <= range; ++dy) {
+      if (dx == 0 && dy == 0)
+        continue;
+      int nx = x + dx;
+      int ny = y + dy;
+      if (nx >= 0 && nx < _boardSize.second && ny >= 0 &&
+          ny < _boardSize.first) {
+        if (state[nx * _boardSize.first + ny] != 0) {
+          return true;
+        }
+      }
+    }
   }
   return false;
 }
