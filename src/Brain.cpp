@@ -34,6 +34,14 @@ int Brain::Brain::stop() {
   return Constants::SUCCESS;
 }
 
+/**
+ * @brief Main logic loop of the engine.
+ *
+ * Continuously retrieves and processes commands from the internal command queue
+ * while the engine is running.
+ *
+ * @return int SUCCESS status code.
+ */
 int Brain::Brain::logicLoop() {
   while (_running) {
     std::string payload;
@@ -99,33 +107,68 @@ int Brain::Brain::inputHandler() {
   return Constants::SUCCESS;
 }
 
+/**
+ * @brief Sends a generic response to the standard output.
+ *
+ * @param response The string message to be printed.
+ */
 void Brain::Brain::sendResponse(const std::string &response) {
   std::lock_guard<std::mutex> lock(_responseMutex);
   std::cout << response << std::endl;
 }
 
+/**
+ * @brief Sends an "OK" confirmation to the manager.
+ */
 void Brain::Brain::sendOk() {
   sendResponse("OK");
 }
 
+/**
+ * @brief Sends an error message to the manager.
+ *
+ * @param errorMessage The description of the error.
+ */
 void Brain::Brain::sendError(const std::string &errorMessage) {
   sendResponse("ERROR " + errorMessage);
 }
 
+/**
+ * @brief Sends an "UNKNOWN" response for unrecognized commands.
+ *
+ * @param message The content of the unrecognized command.
+ */
 void Brain::Brain::sendUnknown(const std::string &message) {
   sendResponse("UNKNOWN " + message);
 }
 
+/**
+ * @brief Sends an informative message to the manager.
+ *
+ * @param message The text message to send.
+ */
 void Brain::Brain::sendMessage(const std::string &message) {
   sendResponse("MESSAGE " + message);
 }
 
+/**
+ * @brief Sends debug information to the manager.
+ *
+ * @param debugInfo The debug string to send.
+ */
 void Brain::Brain::sendDebug(const std::string &debugInfo) {
   sendResponse("DEBUG " + debugInfo);
 }
 
+/**
+ * @brief Sends coordinates to the manager as the engine's move.
+ *
+ * Validates that coordinates are non-negative before sending.
+ *
+ * @param x The X-coordinate.
+ * @param y The Y-coordinate.
+ */
 void Brain::Brain::sendCoordinate(int x, int y) {
-  // Sécurité : n'envoie pas de coordonnées négatives
   if (x < 0 || y < 0) {
     sendError("No valid move found (minimax returned negative index)");
     return;
@@ -218,6 +261,13 @@ void Brain::Brain::handleBegin(const std::string &payload) {
   // TO DO: Choose a move and update _goban accordingly
 }
 
+/**
+ * @brief Handles the BOARD command payload for batch move updates.
+ *
+ * Updates the board state based on the provided coordinates and player ID.
+ *
+ * @param payload The coordinate and player information string "X,Y,P".
+ */
 void Brain::Brain::handleBoard(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -394,6 +444,13 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
       "x" + std::to_string(_boardSize.second));
 }
 
+/**
+ * @brief Handles the RESTART command.
+ *
+ * Clears the board by filling it with zeros and sends an "OK" response.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleRestart(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -443,6 +500,11 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes the PLAY command from the manager.
+ *
+ * @param payload Command payload containing move data.
+ */
 void Brain::Brain::handlePlay(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -452,6 +514,11 @@ void Brain::Brain::handlePlay(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes the SWAP2BOARD command from the manager.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleSwap2Board(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -462,6 +529,11 @@ void Brain::Brain::handleSwap2Board(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes an ERROR message received from the manager.
+ *
+ * @param payload Command payload containing error info.
+ */
 void Brain::Brain::handleError(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -471,6 +543,11 @@ void Brain::Brain::handleError(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes an UNKNOWN command notification from the manager.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleUnknown(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -480,6 +557,11 @@ void Brain::Brain::handleUnknown(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes a MESSAGE command from the manager.
+ *
+ * @param payload Command payload content.
+ */
 void Brain::Brain::handleMessage(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -489,6 +571,11 @@ void Brain::Brain::handleMessage(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes a DEBUG message from the manager.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleDebug(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -498,6 +585,11 @@ void Brain::Brain::handleDebug(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Processes a SUGGEST command from the manager.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleSuggest(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -507,6 +599,14 @@ void Brain::Brain::handleSuggest(const std::string &payload) {
   }
 }
 
+/**
+ * @brief Handles the final DONE command of the BOARD protocol sequence.
+ *
+ * Resets the board activation state and triggers the minimax algorithm to
+ * find and send the best move.
+ *
+ * @param payload Command payload.
+ */
 void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
@@ -587,6 +687,19 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
   return false;
 }
 
+/**
+ * @brief Core AI algorithm for determining the best move.
+ *
+ * Implements a recursive minimax search with alpha-beta pruning to find the 
+ * optimal cell index based on the current board state and desired search depth.
+ *
+ * @param state Current representation of the board.
+ * @param depth Remaining recursion depth.
+ * @param maximizingPlayer Boolean indicating if it is the engine's turn to maximize score.
+ * @param alpha The alpha value for pruning.
+ * @param beta The beta value for pruning.
+ * @return std::pair<int, int> A pair containing the evaluation score and the best move index.
+ */
 std::pair<int, int> Brain::Brain::minimax(State state, int depth,
                                           bool maximizingPlayer, int alpha,
                                           int beta) {
@@ -645,6 +758,13 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
   }
 }
 
+/**
+ * @brief Checks if every cell on the board is occupied.
+ *
+ * @param state The current board state.
+ * @return true If no '0' (empty) cells are found.
+ * @return false If at least one cell is empty.
+ */
 bool Brain::Brain::isBoardFull(const State &state) {
   for (int cell : state) {
     if (cell == 0) {
@@ -654,6 +774,17 @@ bool Brain::Brain::isBoardFull(const State &state) {
   return true;
 }
 
+/**
+ * @brief Evaluates if a specific player has achieved a winning line.
+ *
+ * Scans the board for five consecutive pieces of the same player horizontally,
+ * vertically, or diagonally.
+ *
+ * @param state The current board state.
+ * @param player The ID of the player to check (1 or 2).
+ * @return true If the player has five in a row.
+ * @return false Otherwise.
+ */
 bool Brain::Brain::checkWinCondition(const State &state, int player) {
   for (int i = 0; i < _boardSize.second; ++i) {
     for (int j = 0; j < _boardSize.first; ++j) {
@@ -696,12 +827,29 @@ bool Brain::Brain::checkWinCondition(const State &state, int player) {
   return false;
 }
 
+/**
+ * @brief Creates a copy of the board state and applies a move.
+ *
+ * @param state The original board state.
+ * @param move The index where the piece should be placed.
+ * @param player The player ID placing the piece.
+ * @return State The modified board state.
+ */
 State Brain::Brain::applyMove(const State &state, int move, int player) {
   State newState = state;
   newState[move] = player;
   return newState;
 }
 
+/**
+ * @brief Identifies valid cell indices for the next move.
+ *
+ * Focuses on empty cells that are adjacent to already occupied cells to 
+ * optimize search time.
+ *
+ * @param state The current board state.
+ * @return State A list of indices representing potential moves.
+ */
 State Brain::Brain::getPossibleMoves(const State &state) {
   State moves;
   int proximity_range = 1;
@@ -719,6 +867,17 @@ State Brain::Brain::getPossibleMoves(const State &state) {
   return moves;
 }
 
+/**
+ * @brief Helper to check if a specific cell has occupied neighbors.
+ *
+ * Scans the immediate vicinity of a cell within a specified range.
+ *
+ * @param state The board state.
+ * @param index The index of the cell to check.
+ * @param range The search radius.
+ * @return true If at least one neighbor is not '0'.
+ * @return false Otherwise.
+ */
 bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
   int x = index / _boardSize.first;
   int y = index % _boardSize.first;
