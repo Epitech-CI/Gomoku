@@ -617,6 +617,7 @@ void Brain::Brain::handleDone(const std::string &payload) {
   boardIsActivated = false;
   auto result = minimax(_goban, 5, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
+  _goban[result.second] = 1;
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
 }
