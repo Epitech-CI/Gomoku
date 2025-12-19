@@ -283,8 +283,7 @@ void Brain::Brain::handleBoard(const std::string &payload) {
   std::stringstream ss(command);
   int x, y, player;
   ss >> x >> y >> player;
-  if (x < 0 || x >= _boardSize.first || y < 0 ||
-      y >= _boardSize.second) {
+  if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
     sendError("Invalid BOARD coordinates: (" + std::to_string(x) + ", " +
               std::to_string(y) + ")");
     return;
@@ -503,6 +502,9 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 /**
  * @brief Processes the PLAY command from the manager.
  *
+ * Parses the X and Y coordinates played by the manager and updates the
+ * goban state with '1' (indicating the engine's piece).
+ *
  * @param payload Command payload containing move data.
  */
 void Brain::Brain::handlePlay(const std::string &payload) {
@@ -512,6 +514,22 @@ void Brain::Brain::handlePlay(const std::string &payload) {
         "PLAY command received with empty payload or missing terminators.");
     return;
   }
+  command[command.find(',')] = ' ';
+  std::stringstream ss(command);
+  int x, y;
+  try {
+    ss >> x >> y;
+    if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
+      sendError("Invalid play coordinates: (" + std::to_string(x) + ", " +
+                std::to_string(y) + ")");
+      return;
+    }
+  } catch (...) {
+    sendError("Error parsing PLAY command payload: " + command);
+    return;
+  }
+  _goban[y * _boardSize.first + x] = 1;
+  sendCoordinate(x, y);
 }
 
 /**
@@ -690,15 +708,17 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
 /**
  * @brief Core AI algorithm for determining the best move.
  *
- * Implements a recursive minimax search with alpha-beta pruning to find the 
+ * Implements a recursive minimax search with alpha-beta pruning to find the
  * optimal cell index based on the current board state and desired search depth.
  *
  * @param state Current representation of the board.
  * @param depth Remaining recursion depth.
- * @param maximizingPlayer Boolean indicating if it is the engine's turn to maximize score.
+ * @param maximizingPlayer Boolean indicating if it is the engine's turn to
+ * maximize score.
  * @param alpha The alpha value for pruning.
  * @param beta The beta value for pruning.
- * @return std::pair<int, int> A pair containing the evaluation score and the best move index.
+ * @return std::pair<int, int> A pair containing the evaluation score and the
+ * best move index.
  */
 std::pair<int, int> Brain::Brain::minimax(State state, int depth,
                                           bool maximizingPlayer, int alpha,
@@ -844,7 +864,7 @@ State Brain::Brain::applyMove(const State &state, int move, int player) {
 /**
  * @brief Identifies valid cell indices for the next move.
  *
- * Focuses on empty cells that are adjacent to already occupied cells to 
+ * Focuses on empty cells that are adjacent to already occupied cells to
  * optimize search time.
  *
  * @param state The current board state.
