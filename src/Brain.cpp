@@ -258,7 +258,11 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  // TO DO: Choose a move and update _goban accordingly
+  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
+                        std::numeric_limits<int>::max());
+  _goban[result.second] = 1;
+  sendCoordinate(result.second % _boardSize.first,
+                 result.second / _boardSize.first);
 }
 
 /**
@@ -283,8 +287,7 @@ void Brain::Brain::handleBoard(const std::string &payload) {
   std::stringstream ss(command);
   int x, y, player;
   ss >> x >> y >> player;
-  if (x < 0 || x >= _boardSize.first || y < 0 ||
-      y >= _boardSize.second) {
+  if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
     sendError("Invalid BOARD coordinates: (" + std::to_string(x) + ", " +
               std::to_string(y) + ")");
     return;
@@ -690,15 +693,17 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
 /**
  * @brief Core AI algorithm for determining the best move.
  *
- * Implements a recursive minimax search with alpha-beta pruning to find the 
+ * Implements a recursive minimax search with alpha-beta pruning to find the
  * optimal cell index based on the current board state and desired search depth.
  *
  * @param state Current representation of the board.
  * @param depth Remaining recursion depth.
- * @param maximizingPlayer Boolean indicating if it is the engine's turn to maximize score.
+ * @param maximizingPlayer Boolean indicating if it is the engine's turn to
+ * maximize score.
  * @param alpha The alpha value for pruning.
  * @param beta The beta value for pruning.
- * @return std::pair<int, int> A pair containing the evaluation score and the best move index.
+ * @return std::pair<int, int> A pair containing the evaluation score and the
+ * best move index.
  */
 std::pair<int, int> Brain::Brain::minimax(State state, int depth,
                                           bool maximizingPlayer, int alpha,
@@ -708,7 +713,7 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
   } else if (checkWinCondition(state, 2)) {
     return {PLAYER_TWO_WIN, 0};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {DRAW, 0};
+    return {DRAW, DRAW};
   }
 
   int bestMoveFound = -1;
@@ -717,7 +722,7 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
     int maxEval = std::numeric_limits<int>::min();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, 0};
+      return {DRAW, DRAW};
     }
     for (int move : possibleMoves) {
       State newState = applyMove(state, move, 1);
@@ -738,7 +743,7 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
     int minEval = std::numeric_limits<int>::max();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, 0};
+      return {DRAW, DRAW};
     }
     for (int move : possibleMoves) {
       State newState = applyMove(state, move, 2);
@@ -844,7 +849,7 @@ State Brain::Brain::applyMove(const State &state, int move, int player) {
 /**
  * @brief Identifies valid cell indices for the next move.
  *
- * Focuses on empty cells that are adjacent to already occupied cells to 
+ * Focuses on empty cells that are adjacent to already occupied cells to
  * optimize search time.
  *
  * @param state The current board state.
@@ -862,7 +867,9 @@ State Brain::Brain::getPossibleMoves(const State &state) {
     }
   }
   if (moves.empty()) {
-    moves.push_back(state.size() / 2);
+    int center =
+        (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
+    moves.push_back(center);
   }
   return moves;
 }
