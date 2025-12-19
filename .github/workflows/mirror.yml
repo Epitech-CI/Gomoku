@@ -1,0 +1,20 @@
+name: Push to Mirror
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: github.repository == 'Epitech-CI/Gomoku'
+    steps:
+      - name: Checkout complet
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to mirror
+        run: |
+          git remote add school https://oauth2:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-AIA-500-BDX-5-1-gomoku-7.git
+          git push --force --mirror school
