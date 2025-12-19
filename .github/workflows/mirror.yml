@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'Epitech-CI/Gomoku'
     steps:
-      - name: Checkout complet
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
