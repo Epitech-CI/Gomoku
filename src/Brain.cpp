@@ -238,8 +238,9 @@ void Brain::Brain::handleTurn(const std::string &payload) {
     sendError("Error parsing TURN command payload");
     return;
   }
-  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
+  auto result = minimax(_goban, Constants::DEPTH_LEVEL, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
+  _goban[result.second] = 1;
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
 }
@@ -615,7 +616,7 @@ void Brain::Brain::handleDone(const std::string &payload) {
     return;
   }
   boardIsActivated = false;
-  auto result = minimax(_goban, 5, true, std::numeric_limits<int>::min(),
+  auto result = minimax(_goban, Constants::DEPTH_LEVEL, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
