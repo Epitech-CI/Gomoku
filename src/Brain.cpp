@@ -707,7 +707,7 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
  * @return std::pair<int, int> A pair containing the evaluation score and the
  * best move index.
  */
-std::pair<int, int> Brain::Brain::minimax(State state, int depth,
+std::pair<std::size_t, std::size_t> Brain::Brain::minimax(State state, int depth,
                                           bool maximizingPlayer, int alpha,
                                           int beta) {
   if (checkWinCondition(state, 1)) {
@@ -861,7 +861,7 @@ State Brain::Brain::getPossibleMoves(const State &state) {
   State moves;
   int proximity_range = 1;
 
-  for (int i = 0; i < state.size(); ++i) {
+  for (std::size_t i = 0; i < state.size(); ++i) {
     if (state[i] == 0) {
       if (hasNeighbor(state, i, proximity_range)) {
         moves.push_back(i);
@@ -908,7 +908,7 @@ bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
   return false;
 }
 
-bool Brain::Brain::checkAlgorithmReturn(std::pair<int, int> index) {
+bool Brain::Brain::checkAlgorithmReturn(std::pair<std::size_t, std::size_t> index) {
   if (index.first == DRAW) {
     sendError("No valid move found (minimax returned DRAW)");
     return false;
