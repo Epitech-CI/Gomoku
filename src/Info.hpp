@@ -80,7 +80,7 @@ public:
     return gameType;
   }
 
-  const char getRule() const {
+  char getRule() const {
     return rule;
   }
 
