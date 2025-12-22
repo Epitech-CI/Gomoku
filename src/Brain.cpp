@@ -618,6 +618,11 @@ void Brain::Brain::handleDone(const std::string &payload) {
   boardIsActivated = false;
   auto result = minimax(_goban, Constants::DEPTH_LEVEL, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
+  if (result.second < 0 || result.second >= _goban.size()) {
+    sendError("No valid move found (minimax returned invalid index)");
+    return;
+  }
+  _goban[result.second] = 1;
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
 }
