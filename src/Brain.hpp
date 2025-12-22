@@ -68,6 +68,9 @@ namespace Brain {
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
 
+      // Check algorithm return
+      bool checkAlgorithmReturn(std::pair<int, int> index);
+
     private:
       Info info;
       bool boardIsActivated{false};

@@ -260,6 +260,8 @@ void Brain::Brain::handleBegin(const std::string &payload) {
   }
   auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
+  if (checkAlgorithmReturn(result) == false)
+    return;
   _goban[result.second] = 1;
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
@@ -904,4 +906,20 @@ bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
     }
   }
   return false;
+}
+
+bool Brain::Brain::checkAlgorithmReturn(std::pair<int, int> index) {
+  if (index.first == DRAW) {
+    sendError("No valid move found (minimax returned DRAW)");
+    return false;
+  }
+  if (index.second == PLAYER_ONE_WIN || index.second == PLAYER_TWO_WIN) {
+    sendError("No valid move found (minimax returned PLAYER_WIN)");
+    return false;
+  }
+  if (index.second >= _goban.size() || index.second < 0) {
+    sendError("No valid move found (minimax returned invalid index)");
+    return false;
+  }
+  return true;
 }
