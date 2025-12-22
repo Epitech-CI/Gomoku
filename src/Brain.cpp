@@ -913,7 +913,7 @@ bool Brain::Brain::checkAlgorithmReturn(std::pair<int, int> index) {
     sendError("No valid move found (minimax returned DRAW)");
     return false;
   }
-  if (index.second == PLAYER_ONE_WIN || index.second == PLAYER_TWO_WIN) {
+  if (index.first == PLAYER_ONE_WIN || index.first == PLAYER_TWO_WIN) {
     sendError("No valid move found (minimax returned PLAYER_WIN)");
     return false;
   }
