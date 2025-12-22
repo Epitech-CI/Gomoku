@@ -5,7 +5,6 @@
 ## Build the Gomoku AI project
 ##
 
-CC = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -I src/
 
 SRC = src/Brain.cpp src/Info.cpp src/main.cpp

@@ -707,26 +707,28 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
  * @return std::pair<int, int> A pair containing the evaluation score and the
  * best move index.
  */
-std::pair<std::size_t, std::size_t> Brain::Brain::minimax(State state, int depth,
-                                          bool maximizingPlayer, int alpha,
-                                          int beta) {
+std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
+                                                  bool maximizingPlayer,
+                                                  int alpha, int beta) {
+  constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
+
   if (checkWinCondition(state, 1)) {
-    return {PLAYER_ONE_WIN, 0};
+    return {PLAYER_ONE_WIN, NO_MOVE};
   } else if (checkWinCondition(state, 2)) {
-    return {PLAYER_TWO_WIN, 0};
+    return {PLAYER_TWO_WIN, NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {DRAW, DRAW};
+    return {DRAW, NO_MOVE};
   }
 
-  int bestMoveFound = -1;
+  std::size_t bestMoveFound = NO_MOVE;
 
   if (maximizingPlayer) {
     int maxEval = std::numeric_limits<int>::min();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, DRAW};
+      return {DRAW, NO_MOVE};
     }
-    for (int move : possibleMoves) {
+    for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 1);
       int eval = minimax(newState, depth - 1, false, alpha, beta).first;
       if (eval > maxEval) {
@@ -738,16 +740,16 @@ std::pair<std::size_t, std::size_t> Brain::Brain::minimax(State state, int depth
         break;
       }
     }
-    if (bestMoveFound < 0 && !possibleMoves.empty())
+    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
       bestMoveFound = possibleMoves[0];
     return {maxEval, bestMoveFound};
   } else {
     int minEval = std::numeric_limits<int>::max();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, DRAW};
+      return {DRAW, NO_MOVE};
     }
-    for (int move : possibleMoves) {
+    for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 2);
       int eval = minimax(newState, depth - 1, true, alpha, beta).first;
       if (eval < minEval) {
@@ -759,7 +761,7 @@ std::pair<std::size_t, std::size_t> Brain::Brain::minimax(State state, int depth
         break;
       }
     }
-    if (bestMoveFound < 0 && !possibleMoves.empty())
+    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
       bestMoveFound = possibleMoves[0];
     return {minEval, bestMoveFound};
   }
@@ -908,7 +910,8 @@ bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
   return false;
 }
 
-bool Brain::Brain::checkAlgorithmReturn(std::pair<std::size_t, std::size_t> index) {
+bool Brain::Brain::checkAlgorithmReturn(
+    std::pair<std::size_t, std::size_t> index) {
   if (index.first == DRAW) {
     sendError("No valid move found (minimax returned DRAW)");
     return false;
@@ -917,7 +920,7 @@ bool Brain::Brain::checkAlgorithmReturn(std::pair<std::size_t, std::size_t> inde
     sendError("No valid move found (minimax returned PLAYER_WIN)");
     return false;
   }
-  if (index.second >= _goban.size() || index.second < 0) {
+  if (index.second >= _goban.size() || index.second == std::numeric_limits<std::size_t>::max()) {
     sendError("No valid move found (minimax returned invalid index)");
     return false;
   }
