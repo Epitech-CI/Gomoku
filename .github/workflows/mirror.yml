@@ -1,4 +1,4 @@
--name: Push Mirror Repository
+name: Push Mirror Repository
 
 on:
   workflow_run:
