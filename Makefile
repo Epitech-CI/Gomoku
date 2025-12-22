@@ -1,4 +1,4 @@
-#
+##
 ## EPITECH PROJECT, 2025
 ## Makefile
 ## File description:
