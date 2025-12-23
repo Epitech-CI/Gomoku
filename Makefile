@@ -1,25 +1,31 @@
-##
-## EPITECH PROJECT, 2025
-## Makefile
-## File description:
-## Build the Gomoku AI project
-##
-
-CXXFLAGS = -std=c++20 -Wall -Wextra -I src/
-
-SRC = src/Brain.cpp src/Info.cpp src/main.cpp
 NAME = pbrain-gomoku-ai
 
-all: $(NAME)
+BUILD_DIR = .build
 
-$(NAME): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $(NAME) $(SRC)
+MAKEFLAGS += --no-print-directory
+
+GREEN = \033[0;32m
+RESET = \033[0m
+
+all: cmake
+	@echo "$(GREEN)[ OK ]$(RESET) Files compiled"
+
+cmake:
+	@if [ ! -d "$(BUILD_DIR)" ]; then \
+		cmake -B $(BUILD_DIR); \
+	fi
+	@cmake --build $(BUILD_DIR) --parallel
 
 clean:
-	rm -f $(NAME)
+	@rm -rf $(BUILD_DIR)
+	@rm -rf .cache
 
 fclean: clean
+	@rm -f $(NAME)
+	@rm -f compile_commands.json
 
-re: fclean all
+re: fclean
+	@cmake -B $(BUILD_DIR)
+	@cmake --build $(BUILD_DIR) --parallel
 
-.PHONY: all clean fclean re
+.PHONY: all cmake clean fclean re
