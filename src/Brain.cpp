@@ -506,7 +506,11 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 }
 
 /**
- * @brief Processes the PLAY command from the manager.
+ * @brief Processes the PLAY command where the manager instructs the engine to place a piece.
+ *
+ * Parses the X and Y coordinates specified by the manager and updates the
+ * goban state with '1' (indicating the engine's piece).
+ * The engine acknowledges by echoing back the same coordinates.
  *
  * @param payload Command payload containing move data.
  */
@@ -517,6 +521,33 @@ void Brain::Brain::handlePlay(const std::string &payload) {
         "PLAY command received with empty payload or missing terminators.");
     return;
   }
+  size_t comma_pos = command.find(',');
+  if (comma_pos == std::string::npos) {
+    sendError("PLAY command malformed: expected format 'X,Y'");
+    return;
+  }
+  command[comma_pos] = ' ';
+  std::stringstream ss(command);
+  int x, y;
+  try {
+    ss >> x >> y;
+    if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
+      sendError("Invalid play coordinates: (" + std::to_string(x) + ", " +
+                std::to_string(y) + ")");
+      return;
+    }
+  } catch (...) {
+    sendError("Error parsing PLAY command payload: " + command);
+    return;
+  }
+  int cellIndex = y * _boardSize.first + x;
+  if (_goban[cellIndex] != 0) {
+    sendError("Invalid move: cell (" + std::to_string(x) + ", " +
+              std::to_string(y) + ") is already occupied");
+    return;
+  }
+  _goban[cellIndex] = 1;
+  sendCoordinate(x, y);
 }
 
 /**
