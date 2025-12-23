@@ -1,8 +1,17 @@
 cmake_minimum_required(VERSION 3.16)
 project(pbrain-gomoku-ai)
 
-if(NOT CMAKE_BUILD_TYPE)
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_BUILD_TYPE Release)
+    add_compile_options(-march=native)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT result OUTPUT output)
+    if(result)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    endif()
+elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-fsanitize=address,undefined -g)
+    add_link_options(-fsanitize=address,undefined)
 endif()
 
 add_compile_options(-Wall -Wextra)
@@ -23,3 +32,7 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE
     src/
 )
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX "-debug")
+endif()

@@ -10,9 +10,14 @@ RESET = \033[0m
 all: cmake
 	@echo "$(GREEN)[ OK ]$(RESET) Files compiled"
 
+debug:
+	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
+	@cmake --build $(BUILD_DIR) --parallel
+	@echo "$(GREEN)[ OK ]$(RESET) Debug build compiled"
+
 cmake:
 	@if [ ! -d "$(BUILD_DIR)" ]; then \
-		cmake -B $(BUILD_DIR); \
+		cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release; \
 	fi
 	@cmake --build $(BUILD_DIR) --parallel
 
@@ -22,10 +27,11 @@ clean:
 
 fclean: clean
 	@rm -f $(NAME)
+	@rm -f $(NAME)-debug
 	@rm -f compile_commands.json
 
 re: fclean
 	@cmake -B $(BUILD_DIR)
 	@cmake --build $(BUILD_DIR) --parallel
 
-.PHONY: all cmake clean fclean re
+.PHONY: all debug cmake clean fclean re
