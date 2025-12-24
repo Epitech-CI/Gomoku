@@ -1,6 +1,8 @@
 cmake-build-debug
-/.build
+.build
+.build-debug
 pbrain-gomoku-ai
+pbrain-gomoku-ai-debug
 .idea
 compile_commands.json
 test.py
