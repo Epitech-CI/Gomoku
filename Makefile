@@ -1,3 +1,10 @@
+##
+## EPITECH PROJECT, 2025
+## Makefile
+## File description:
+## Build the Gomoku AI project
+##
+
 NAME = pbrain-gomoku-ai
 
 BUILD_DIR = .build
