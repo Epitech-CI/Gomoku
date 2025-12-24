@@ -1,6 +1,7 @@
 #include "Brain.hpp"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include "Constants.hpp"
 

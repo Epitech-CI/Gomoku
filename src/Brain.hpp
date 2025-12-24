@@ -2,6 +2,10 @@
 
 #include <thread>
 #include <unordered_map>
+#include <functional>
+#include <queue>
+#include <condition_variable>
+#include <mutex>
 #include "Info.hpp"
 #include "Types.hpp"
 
