@@ -19,16 +19,12 @@ RESET = \033[0m
 all: cmake
 
 debug:
-	@if [ ! -d "$(DEBUG_BUILD_DIR)" ]; then \
-		cmake -B $(DEBUG_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug; \
-	fi
+	@cmake -B $(DEBUG_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
 	@cmake --build $(DEBUG_BUILD_DIR) --parallel
 	@echo "$(GREEN)[ OK ]$(RESET) Debug build compiled"
 
 cmake:
-	@if [ ! -d "$(BUILD_DIR)" ]; then \
-		cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release; \
-	fi
+	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
 	@cmake --build $(BUILD_DIR) --parallel
 	@echo "$(GREEN)[ OK ]$(RESET) Files compiled"
 
