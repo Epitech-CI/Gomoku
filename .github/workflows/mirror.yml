@@ -5,16 +5,20 @@ on:
     branches: [ "main" ]
 
 jobs:
-  mirror:
+  push_to_mirror:
+    if: github.repository == vars.SHORT_REPO_URL
+    name: Push to Mirror
     runs-on: ubuntu-latest
-    if: github.repository == 'Epitech-CI/Gomoku'
+    container:
+      image: epitechcontent/epitest-docker
     steps:
-      - name: Checkout complet
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Push to mirror
-        run: |
-          git remote add school https://oauth2:${{ secrets.MIRROR_TOKEN }}@github.com/EpitechPGE3-2025/G-AIA-500-BDX-5-1-gomoku-7.git
-          git push --force --mirror school
+      - name: Push to Mirror
+        uses: pixta-dev/repository-mirroring-action@674e65a7d483ca28dafaacba0d07351bdcc8bd75
+        with:
+          ssh_private_key: ${{ secrets.GIT_SSH_PRIVATE_KEY }}
+          target_repo_url: ${{ secrets.MIRROR_URL }}

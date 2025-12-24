@@ -259,7 +259,13 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  // TO DO: Choose a move and update _goban accordingly
+  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
+                        std::numeric_limits<int>::max());
+  if (checkAlgorithmReturn(result) == false)
+    return;
+  _goban[result.second] = 1;
+  sendCoordinate(result.second % _boardSize.first,
+                 result.second / _boardSize.first);
 }
 
 /**
@@ -284,8 +290,7 @@ void Brain::Brain::handleBoard(const std::string &payload) {
   std::stringstream ss(command);
   int x, y, player;
   ss >> x >> y >> player;
-  if (x < 0 || x >= _boardSize.first || y < 0 ||
-      y >= _boardSize.second) {
+  if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
     sendError("Invalid BOARD coordinates: (" + std::to_string(x) + ", " +
               std::to_string(y) + ")");
     return;
@@ -502,7 +507,11 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 }
 
 /**
- * @brief Processes the PLAY command from the manager.
+ * @brief Processes the PLAY command where the manager instructs the engine to place a piece.
+ *
+ * Parses the X and Y coordinates specified by the manager and updates the
+ * goban state with '1' (indicating the engine's piece).
+ * The engine acknowledges by echoing back the same coordinates.
  *
  * @param payload Command payload containing move data.
  */
@@ -513,6 +522,33 @@ void Brain::Brain::handlePlay(const std::string &payload) {
         "PLAY command received with empty payload or missing terminators.");
     return;
   }
+  size_t comma_pos = command.find(',');
+  if (comma_pos == std::string::npos) {
+    sendError("PLAY command malformed: expected format 'X,Y'");
+    return;
+  }
+  command[comma_pos] = ' ';
+  std::stringstream ss(command);
+  int x, y;
+  try {
+    ss >> x >> y;
+    if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
+      sendError("Invalid play coordinates: (" + std::to_string(x) + ", " +
+                std::to_string(y) + ")");
+      return;
+    }
+  } catch (...) {
+    sendError("Error parsing PLAY command payload: " + command);
+    return;
+  }
+  int cellIndex = y * _boardSize.first + x;
+  if (_goban[cellIndex] != 0) {
+    sendError("Invalid move: cell (" + std::to_string(x) + ", " +
+              std::to_string(y) + ") is already occupied");
+    return;
+  }
+  _goban[cellIndex] = 1;
+  sendCoordinate(x, y);
 }
 
 /**
@@ -618,8 +654,9 @@ void Brain::Brain::handleDone(const std::string &payload) {
   boardIsActivated = false;
   auto result = minimax(_goban, Constants::DEPTH_LEVEL, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
-  if (result.second < 0 || result.second >= _goban.size()) {
-    sendError("No valid move found (minimax returned invalid index)");
+  if (result.second >= _goban.size() || result.second < 0) {
+    sendError("Minimax returned invalid move index: " +
+              std::to_string(result.second));
     return;
   }
   _goban[result.second] = 1;
@@ -696,36 +733,40 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
 /**
  * @brief Core AI algorithm for determining the best move.
  *
- * Implements a recursive minimax search with alpha-beta pruning to find the 
+ * Implements a recursive minimax search with alpha-beta pruning to find the
  * optimal cell index based on the current board state and desired search depth.
  *
  * @param state Current representation of the board.
  * @param depth Remaining recursion depth.
- * @param maximizingPlayer Boolean indicating if it is the engine's turn to maximize score.
+ * @param maximizingPlayer Boolean indicating if it is the engine's turn to
+ * maximize score.
  * @param alpha The alpha value for pruning.
  * @param beta The beta value for pruning.
- * @return std::pair<int, int> A pair containing the evaluation score and the best move index.
+ * @return std::pair<int, int> A pair containing the evaluation score and the
+ * best move index.
  */
-std::pair<int, int> Brain::Brain::minimax(State state, int depth,
-                                          bool maximizingPlayer, int alpha,
-                                          int beta) {
+std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
+                                                  bool maximizingPlayer,
+                                                  int alpha, int beta) {
+  constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
+
   if (checkWinCondition(state, 1)) {
-    return {PLAYER_ONE_WIN, 0};
+    return {PLAYER_ONE_WIN, NO_MOVE};
   } else if (checkWinCondition(state, 2)) {
-    return {PLAYER_TWO_WIN, 0};
+    return {PLAYER_TWO_WIN, NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {DRAW, 0};
+    return {DRAW, NO_MOVE};
   }
 
-  int bestMoveFound = -1;
+  std::size_t bestMoveFound = NO_MOVE;
 
   if (maximizingPlayer) {
     int maxEval = std::numeric_limits<int>::min();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, 0};
+      return {DRAW, NO_MOVE};
     }
-    for (int move : possibleMoves) {
+    for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 1);
       int eval = minimax(newState, depth - 1, false, alpha, beta).first;
       if (eval > maxEval) {
@@ -737,16 +778,16 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
         break;
       }
     }
-    if (bestMoveFound < 0 && !possibleMoves.empty())
+    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
       bestMoveFound = possibleMoves[0];
     return {maxEval, bestMoveFound};
   } else {
     int minEval = std::numeric_limits<int>::max();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, 0};
+      return {DRAW, NO_MOVE};
     }
-    for (int move : possibleMoves) {
+    for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 2);
       int eval = minimax(newState, depth - 1, true, alpha, beta).first;
       if (eval < minEval) {
@@ -758,7 +799,7 @@ std::pair<int, int> Brain::Brain::minimax(State state, int depth,
         break;
       }
     }
-    if (bestMoveFound < 0 && !possibleMoves.empty())
+    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
       bestMoveFound = possibleMoves[0];
     return {minEval, bestMoveFound};
   }
@@ -850,7 +891,7 @@ State Brain::Brain::applyMove(const State &state, int move, int player) {
 /**
  * @brief Identifies valid cell indices for the next move.
  *
- * Focuses on empty cells that are adjacent to already occupied cells to 
+ * Focuses on empty cells that are adjacent to already occupied cells to
  * optimize search time.
  *
  * @param state The current board state.
@@ -860,7 +901,7 @@ State Brain::Brain::getPossibleMoves(const State &state) {
   State moves;
   int proximity_range = 1;
 
-  for (int i = 0; i < state.size(); ++i) {
+  for (std::size_t i = 0; i < state.size(); ++i) {
     if (state[i] == 0) {
       if (hasNeighbor(state, i, proximity_range)) {
         moves.push_back(i);
@@ -868,7 +909,9 @@ State Brain::Brain::getPossibleMoves(const State &state) {
     }
   }
   if (moves.empty()) {
-    moves.push_back(state.size() / 2);
+    int center =
+        (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
+    moves.push_back(center);
   }
   return moves;
 }
@@ -903,4 +946,21 @@ bool Brain::Brain::hasNeighbor(const State &state, int index, int range) {
     }
   }
   return false;
+}
+
+bool Brain::Brain::checkAlgorithmReturn(
+    std::pair<std::size_t, std::size_t> index) {
+  if (index.first == DRAW) {
+    sendError("No valid move found (minimax returned DRAW)");
+    return false;
+  }
+  if (index.first == PLAYER_ONE_WIN || index.first == PLAYER_TWO_WIN) {
+    sendError("No valid move found (minimax returned PLAYER_WIN)");
+    return false;
+  }
+  if (index.second >= _goban.size() || index.second == std::numeric_limits<std::size_t>::max()) {
+    sendError("No valid move found (minimax returned invalid index)");
+    return false;
+  }
+  return true;
 }
