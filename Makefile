@@ -39,7 +39,7 @@ fclean: clean
 	@rm -f compile_commands.json
 
 re: fclean
-	@cmake -B $(BUILD_DIR)
+	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
 	@cmake --build $(BUILD_DIR) --parallel
 
 .PHONY: all debug cmake clean fclean re
