@@ -239,8 +239,13 @@ void Brain::Brain::handleTurn(const std::string &payload) {
     sendError("Error parsing TURN command payload");
     return;
   }
-  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
+
+  auto result = minimax(_goban, 4, true, std::numeric_limits<int>::min(),
                         std::numeric_limits<int>::max());
+
+  if (result.second != std::numeric_limits<std::size_t>::max()) {
+    _goban[result.second] = 1;
+  }
   sendCoordinate(result.second % _boardSize.first,
                  result.second / _boardSize.first);
 }
@@ -386,17 +391,10 @@ void Brain::Brain::handleAbout(const std::string &payload) {
         "ABOUT command received with empty payload or missing terminators.");
     return;
   }
-
-  std::ifstream aboutFile(Constants::ABOUT_FILE);
-  if (aboutFile.is_open()) {
-    std::string line;
-    while (std::getline(aboutFile, line)) {
-      std::cout << line << std::endl;
-    }
-    aboutFile.close();
-  } else {
-    sendDebug("Unable to open ABOUT file");
-  }
+  sendResponse(
+      "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
+      "country=\"France\"");
+  return;
 }
 
 /**
@@ -741,11 +739,11 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
 
   if (checkWinCondition(state, 1)) {
-    return {PLAYER_ONE_WIN, NO_MOVE};
+    return {10000 - (10 - depth), NO_MOVE};
   } else if (checkWinCondition(state, 2)) {
-    return {PLAYER_TWO_WIN, NO_MOVE};
+    return {-10000 + (10 - depth), NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {DRAW, NO_MOVE};
+    return {0, NO_MOVE};
   }
 
   std::size_t bestMoveFound = NO_MOVE;
@@ -754,7 +752,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
     int maxEval = std::numeric_limits<int>::min();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, NO_MOVE};
+      return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 1);
@@ -775,7 +773,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
     int minEval = std::numeric_limits<int>::max();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, NO_MOVE};
+      return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 2);
@@ -898,12 +896,45 @@ State Brain::Brain::getPossibleMoves(const State &state) {
       }
     }
   }
+
   if (moves.empty()) {
     int center =
         (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
-    moves.push_back(center);
+    if (state[center] == 0) {
+      moves.push_back(center);
+    } else {
+      for (std::size_t i = 0; i < state.size(); ++i) {
+        if (state[i] == 0) {
+          moves.push_back(i);
+          break;
+        }
+      }
+    }
   }
   return moves;
+}
+
+/**
+ * @brief Evaluates the score of a player on the board.
+ *
+ * Iterates over the entire board and adds 10 points for each cell occupied by
+ * the specified player. This function provides a simple heuristic based on the
+ * number of the player's pieces on the board.
+ *
+ * @param state Current representation of the board.
+ * @param player Identifier of the player to evaluate (1 or 2).
+ * @return int Total score based on the number of the player's pieces.
+ */
+int Brain::Brain::evaluate(const State &state, int player) {
+  int score = 0;
+  for (int i = 0; i < _boardSize.second; ++i) {
+    for (int j = 0; j < _boardSize.first; ++j) {
+      if (state[i * _boardSize.first + j] == player) {
+        score += 10;
+      }
+    }
+  }
+  return score;
 }
 
 /**
