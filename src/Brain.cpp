@@ -245,9 +245,11 @@ void Brain::Brain::handleTurn(const std::string &payload) {
 
   if (result.second != std::numeric_limits<std::size_t>::max()) {
     _goban[result.second] = 1;
+    sendCoordinate(result.second % _boardSize.first,
+                   result.second / _boardSize.first);
+  } else {
+    sendError("No valid move found");
   }
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
 }
 
 /**
@@ -743,7 +745,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
   } else if (checkWinCondition(state, 2)) {
     return {-10000 + (10 - depth), NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {0, NO_MOVE};
+    return {evaluate(state, 1), NO_MOVE};
   }
 
   std::size_t bestMoveFound = NO_MOVE;
@@ -927,10 +929,14 @@ State Brain::Brain::getPossibleMoves(const State &state) {
  */
 int Brain::Brain::evaluate(const State &state, int player) {
   int score = 0;
+  int opponent = (player == 1) ? 2 : 1;
   for (int i = 0; i < _boardSize.second; ++i) {
     for (int j = 0; j < _boardSize.first; ++j) {
-      if (state[i * _boardSize.first + j] == player) {
+      int cell = state[i * _boardSize.first + j];
+      if (cell == player) {
         score += 10;
+      } else if (cell == opponent) {
+        score -= 10;
       }
     }
   }
