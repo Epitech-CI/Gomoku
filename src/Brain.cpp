@@ -259,13 +259,10 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
-                        std::numeric_limits<int>::max());
-  if (checkAlgorithmReturn(result) == false)
-    return;
-  _goban[result.second] = 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
+  auto middle =
+      (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
+  _goban[middle] = 1;
+  sendCoordinate(middle % _boardSize.first, middle / _boardSize.first);
 }
 
 /**
@@ -301,13 +298,6 @@ void Brain::Brain::handleBoard(const std::string &payload) {
     return;
   }
   _goban[y * _boardSize.first + x] = player;
-  for (int i = 0; i < _boardSize.first; i++) {
-    for (int j = 0; j < _boardSize.second; j++) {
-      std::cerr << _goban[i * _boardSize.first + j] << " ";
-    }
-    std::cerr << std::endl;
-  }
-  std::cerr << "----" << std::endl;
 }
 
 /**
@@ -321,9 +311,8 @@ void Brain::Brain::handleBoard(const std::string &payload) {
 void Brain::Brain::handleInfo(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "INFO command received with empty payload or missing terminators."
-        << std::endl;
+    sendError(
+        "INFO command received with empty payload or missing terminators.");
     return;
   }
   std::stringstream ss(command);
@@ -507,7 +496,8 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 }
 
 /**
- * @brief Processes the PLAY command where the manager instructs the engine to place a piece.
+ * @brief Processes the PLAY command where the manager instructs the engine to
+ * place a piece.
  *
  * Parses the X and Y coordinates specified by the manager and updates the
  * goban state with '1' (indicating the engine's piece).
@@ -958,7 +948,8 @@ bool Brain::Brain::checkAlgorithmReturn(
     sendError("No valid move found (minimax returned PLAYER_WIN)");
     return false;
   }
-  if (index.second >= _goban.size() || index.second == std::numeric_limits<std::size_t>::max()) {
+  if (index.second >= _goban.size() ||
+      index.second == std::numeric_limits<std::size_t>::max()) {
     sendError("No valid move found (minimax returned invalid index)");
     return false;
   }
