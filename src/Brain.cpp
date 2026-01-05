@@ -259,13 +259,11 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
-                        std::numeric_limits<int>::max());
-  if (checkAlgorithmReturn(result) == false)
-    return;
-  _goban[result.second] = 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
+  auto middle = (_boardSize.second / 2) * _boardSize.first +
+                (_boardSize.first / 2);
+  _goban[middle] = 1;
+  sendCoordinate(middle % _boardSize.first,
+                 middle / _boardSize.first);
 }
 
 /**
@@ -301,13 +299,6 @@ void Brain::Brain::handleBoard(const std::string &payload) {
     return;
   }
   _goban[y * _boardSize.first + x] = player;
-  for (int i = 0; i < _boardSize.first; i++) {
-    for (int j = 0; j < _boardSize.second; j++) {
-      std::cerr << _goban[i * _boardSize.first + j] << " ";
-    }
-    std::cerr << std::endl;
-  }
-  std::cerr << "----" << std::endl;
 }
 
 /**
@@ -912,6 +903,8 @@ State Brain::Brain::getPossibleMoves(const State &state) {
     int center =
         (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
     moves.push_back(center);
+    std::cerr << "No adjacent moves found, defaulting to center: " << center
+              << std::endl;
   }
   return moves;
 }
