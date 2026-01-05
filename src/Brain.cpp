@@ -259,11 +259,10 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  auto middle = (_boardSize.second / 2) * _boardSize.first +
-                (_boardSize.first / 2);
+  auto middle =
+      (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
   _goban[middle] = 1;
-  sendCoordinate(middle % _boardSize.first,
-                 middle / _boardSize.first);
+  sendCoordinate(middle % _boardSize.first, middle / _boardSize.first);
 }
 
 /**
@@ -312,9 +311,8 @@ void Brain::Brain::handleBoard(const std::string &payload) {
 void Brain::Brain::handleInfo(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "INFO command received with empty payload or missing terminators."
-        << std::endl;
+    sendError(
+        "INFO command received with empty payload or missing terminators.");
     return;
   }
   std::stringstream ss(command);
@@ -498,7 +496,8 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
 }
 
 /**
- * @brief Processes the PLAY command where the manager instructs the engine to place a piece.
+ * @brief Processes the PLAY command where the manager instructs the engine to
+ * place a piece.
  *
  * Parses the X and Y coordinates specified by the manager and updates the
  * goban state with '1' (indicating the engine's piece).
@@ -903,8 +902,6 @@ State Brain::Brain::getPossibleMoves(const State &state) {
     int center =
         (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
     moves.push_back(center);
-    std::cerr << "No adjacent moves found, defaulting to center: " << center
-              << std::endl;
   }
   return moves;
 }
@@ -951,7 +948,8 @@ bool Brain::Brain::checkAlgorithmReturn(
     sendError("No valid move found (minimax returned PLAYER_WIN)");
     return false;
   }
-  if (index.second >= _goban.size() || index.second == std::numeric_limits<std::size_t>::max()) {
+  if (index.second >= _goban.size() ||
+      index.second == std::numeric_limits<std::size_t>::max()) {
     sendError("No valid move found (minimax returned invalid index)");
     return false;
   }
