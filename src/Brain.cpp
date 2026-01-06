@@ -98,7 +98,10 @@ int Brain::Brain::inputHandler() {
   _running = true;
 
   while (_running) {
-    std::getline(std::cin, data);
+    if (!std::getline(std::cin, data)) {
+        _running = false;
+        break;
+    }
     {
       std::lock_guard<std::mutex> lock(_queueMutex);
       _commandQueue.push(data);
