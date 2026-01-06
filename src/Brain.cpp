@@ -100,6 +100,7 @@ int Brain::Brain::inputHandler() {
   while (_running) {
     if (!std::getline(std::cin, data)) {
         _running = false;
+        _cv.notify_one();
         break;
     }
     {
