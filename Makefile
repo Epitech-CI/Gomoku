@@ -5,21 +5,41 @@
 ## Build the Gomoku AI project
 ##
 
-CXXFLAGS = -std=c++20 -Wall -Wextra -I src/
-
-SRC = src/Brain.cpp src/Info.cpp src/main.cpp
 NAME = pbrain-gomoku-ai
 
-all: $(NAME)
+BUILD_DIR = .build
 
-$(NAME): $(SRC)
-	$(CXX) $(CXXFLAGS) -o $(NAME) $(SRC)
+DEBUG_BUILD_DIR = .build-debug
+
+MAKEFLAGS += --no-print-directory
+
+GREEN = \033[0;32m
+RESET = \033[0m
+
+all: cmake
+
+debug:
+	@cmake -B $(DEBUG_BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
+	@cmake --build $(DEBUG_BUILD_DIR) --parallel
+	@echo "$(GREEN)[ OK ]$(RESET) Debug build compiled"
+
+cmake:
+	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	@cmake --build $(BUILD_DIR) --parallel
+	@echo "$(GREEN)[ OK ]$(RESET) Files compiled"
 
 clean:
-	rm -f $(NAME)
+	@rm -rf $(BUILD_DIR)
+	@rm -rf $(DEBUG_BUILD_DIR)
+	@rm -rf .cache
 
 fclean: clean
+	@rm -f $(NAME)
+	@rm -f $(NAME)-debug
+	@rm -f compile_commands.json
 
-re: fclean all
+re: fclean
+	@cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	@cmake --build $(BUILD_DIR) --parallel
 
-.PHONY: all clean fclean re
+.PHONY: all debug cmake clean fclean re

@@ -1,6 +1,7 @@
 #include "Brain.hpp"
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include "Constants.hpp"
 
@@ -97,7 +98,11 @@ int Brain::Brain::inputHandler() {
   _running = true;
 
   while (_running) {
-    std::getline(std::cin, data);
+    if (!std::getline(std::cin, data)) {
+      _running = false;
+      _cv.notify_one();
+      break;
+    }
     {
       std::lock_guard<std::mutex> lock(_queueMutex);
       _commandQueue.push(data);
@@ -241,14 +246,13 @@ void Brain::Brain::handleTurn(const std::string &payload) {
   auto result =
       minimax(_goban, Constants::DEPTH_LEVEL, true,
               std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
-  if (result.second >= _goban.size() || result.second < 0) {
-    sendError("Minimax returned invalid move index: " +
-              std::to_string(result.second));
-    return;
+  if (result.second != std::numeric_limits<std::size_t>::max()) {
+    _goban[result.second] = 1;
+    sendCoordinate(result.second % _boardSize.first,
+                   result.second / _boardSize.first);
+  } else {
+    sendError("No valid move found");
   }
-  _goban[result.second] = 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
 }
 
 /**
@@ -265,13 +269,10 @@ void Brain::Brain::handleBegin(const std::string &payload) {
         "BEGIN command received with empty payload or missing terminators.");
     return;
   }
-  auto result = minimax(_goban, 3, true, std::numeric_limits<int>::min(),
-                        std::numeric_limits<int>::max());
-  if (checkAlgorithmReturn(result) == false)
-    return;
-  _goban[result.second] = 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
+  auto middle =
+      (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
+  _goban[middle] = 1;
+  sendCoordinate(middle % _boardSize.first, middle / _boardSize.first);
 }
 
 /**
@@ -307,13 +308,6 @@ void Brain::Brain::handleBoard(const std::string &payload) {
     return;
   }
   _goban[y * _boardSize.first + x] = player;
-  for (int i = 0; i < _boardSize.first; i++) {
-    for (int j = 0; j < _boardSize.second; j++) {
-      std::cerr << _goban[i * _boardSize.first + j] << " ";
-    }
-    std::cerr << std::endl;
-  }
-  std::cerr << "----" << std::endl;
 }
 
 /**
@@ -327,9 +321,8 @@ void Brain::Brain::handleBoard(const std::string &payload) {
 void Brain::Brain::handleInfo(const std::string &payload) {
   std::string command = payload;
   if (checkTerminator(command) == false) {
-    std::cerr
-        << "INFO command received with empty payload or missing terminators."
-        << std::endl;
+    sendError(
+        "INFO command received with empty payload or missing terminators.");
     return;
   }
   std::stringstream ss(command);
@@ -403,17 +396,10 @@ void Brain::Brain::handleAbout(const std::string &payload) {
         "ABOUT command received with empty payload or missing terminators.");
     return;
   }
-
-  std::ifstream aboutFile(Constants::ABOUT_FILE);
-  if (aboutFile.is_open()) {
-    std::string line;
-    while (std::getline(aboutFile, line)) {
-      std::cout << line << std::endl;
-    }
-    aboutFile.close();
-  } else {
-    sendDebug("Unable to open ABOUT file");
-  }
+  sendResponse(
+      "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
+      "country=\"France\"");
+  return;
 }
 
 /**
@@ -759,11 +745,11 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
 
   if (checkWinCondition(state, 1)) {
-    return {PLAYER_ONE_WIN, NO_MOVE};
+    return {10000 - (10 - depth), NO_MOVE};
   } else if (checkWinCondition(state, 2)) {
-    return {PLAYER_TWO_WIN, NO_MOVE};
+    return {-10000 + (10 - depth), NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
-    return {DRAW, NO_MOVE};
+    return {evaluate(state, 1), NO_MOVE};
   }
 
   std::size_t bestMoveFound = NO_MOVE;
@@ -772,7 +758,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
     int maxEval = std::numeric_limits<int>::min();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, NO_MOVE};
+      return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 1);
@@ -793,7 +779,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
     int minEval = std::numeric_limits<int>::max();
     State possibleMoves = getPossibleMoves(state);
     if (possibleMoves.empty()) {
-      return {DRAW, NO_MOVE};
+      return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
       State newState = applyMove(state, move, 2);
@@ -916,12 +902,49 @@ State Brain::Brain::getPossibleMoves(const State &state) {
       }
     }
   }
+
   if (moves.empty()) {
     int center =
         (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
-    moves.push_back(center);
+    if (state[center] == 0) {
+      moves.push_back(center);
+    } else {
+      for (std::size_t i = 0; i < state.size(); ++i) {
+        if (state[i] == 0) {
+          moves.push_back(i);
+          break;
+        }
+      }
+    }
   }
   return moves;
+}
+
+/**
+ * @brief Evaluates the score of a player on the board.
+ *
+ * Iterates over the entire board and adds 10 points for each cell occupied by
+ * the specified player. This function provides a simple heuristic based on the
+ * number of the player's pieces on the board.
+ *
+ * @param state Current representation of the board.
+ * @param player Identifier of the player to evaluate (1 or 2).
+ * @return int Total score based on the number of the player's pieces.
+ */
+int Brain::Brain::evaluate(const State &state, int player) {
+  int score = 0;
+  int opponent = (player == 1) ? 2 : 1;
+  for (int i = 0; i < _boardSize.second; ++i) {
+    for (int j = 0; j < _boardSize.first; ++j) {
+      int cell = state[i * _boardSize.first + j];
+      if (cell == player) {
+        score += 10;
+      } else if (cell == opponent) {
+        score -= 10;
+      }
+    }
+  }
+  return score;
 }
 
 /**

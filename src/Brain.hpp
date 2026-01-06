@@ -1,7 +1,12 @@
 #pragma once
 
+#include <atomic>
 #include <thread>
 #include <unordered_map>
+#include <functional>
+#include <queue>
+#include <condition_variable>
+#include <mutex>
 #include "Info.hpp"
 #include "Types.hpp"
 
@@ -67,6 +72,7 @@ namespace Brain {
       bool checkWinCondition(const State &state, int player);
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
+      int evaluate(const State &state, int player);
 
       // Check algorithm return
       bool checkAlgorithmReturn(std::pair<std::size_t, std::size_t> index);
