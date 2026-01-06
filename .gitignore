@@ -1,12 +1,13 @@
 cmake-build-debug
-.build
-.build-debug
+.build/
+.build-debug/
 pbrain-gomoku-ai
 pbrain-gomoku-ai-debug
-.idea
+.idea/
 compile_commands.json
 test.py
 board.log
 config.ini
 liskvork-aarch64-macos-0.6.1
 replay.log
+ai/
