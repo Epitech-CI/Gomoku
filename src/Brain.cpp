@@ -99,9 +99,9 @@ int Brain::Brain::inputHandler() {
 
   while (_running) {
     if (!std::getline(std::cin, data)) {
-        _running = false;
-        _cv.notify_one();
-        break;
+      _running = false;
+      _cv.notify_one();
+      break;
     }
     {
       std::lock_guard<std::mutex> lock(_queueMutex);
@@ -243,10 +243,9 @@ void Brain::Brain::handleTurn(const std::string &payload) {
     sendError("Error parsing TURN command payload");
     return;
   }
-
-  auto result = minimax(_goban, 4, true, std::numeric_limits<int>::min(),
-                        std::numeric_limits<int>::max());
-
+  auto result =
+      minimax(_goban, Constants::DEPTH_LEVEL, true,
+              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
   if (result.second != std::numeric_limits<std::size_t>::max()) {
     _goban[result.second] = 1;
     sendCoordinate(result.second % _boardSize.first,
@@ -646,8 +645,9 @@ void Brain::Brain::handleDone(const std::string &payload) {
     return;
   }
   boardIsActivated = false;
-  auto result = minimax(_goban, 5, true, std::numeric_limits<int>::min(),
-                        std::numeric_limits<int>::max());
+  auto result =
+      minimax(_goban, Constants::DEPTH_LEVEL, true,
+              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
   if (result.second >= _goban.size() || result.second < 0) {
     sendError("Minimax returned invalid move index: " +
               std::to_string(result.second));
