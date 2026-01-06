@@ -6,3 +6,7 @@ pbrain-gomoku-ai-debug
 .idea
 compile_commands.json
 test.py
+board.log
+config.ini
+liskvork-aarch64-macos-0.6.1
+replay.log

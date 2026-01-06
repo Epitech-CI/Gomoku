@@ -31,7 +31,7 @@ int Brain::Brain::start() {
 int Brain::Brain::stop() {
   _running = false;
   if (_inputHandler.joinable())
-    _inputHandler.join();
+    _inputHandler.detach();
   return Constants::SUCCESS;
 }
 
@@ -399,7 +399,6 @@ void Brain::Brain::handleAbout(const std::string &payload) {
   sendResponse(
       "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
       "country=\"France\"");
-  return;
 }
 
 /**
