@@ -401,7 +401,7 @@ void Brain::Brain::handleEnd(const std::string &payload) {
 /**
  * @brief Handles the ABOUT command.
  *
- * Reads from the ABOUT.txt file and prints the engine information to stdout.
+ * Reads from the ABOUT constant and prints the engine information to stdout.
  *
  * @param payload Command payload.
  */
@@ -412,9 +412,7 @@ void Brain::Brain::handleAbout(const std::string &payload) {
         "ABOUT command received with empty payload or missing terminators.");
     return;
   }
-  sendResponse(
-      "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
-      "country=\"France\"");
+  sendResponse(Constants::ABOUT);
 }
 
 /**
