@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <sys/select.h>
+#include <unistd.h>
 #include "Constants.hpp"
 
 /**
@@ -98,17 +100,31 @@ int Brain::Brain::inputHandler() {
   _running = true;
 
   while (_running) {
-    if (!std::getline(std::cin, data)) {
-      _running = false;
-      _cv.notify_one();
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 100000;
+
+    int ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &timeout);
+    if (ret == -1) {
       break;
+    } else if (ret > 0) {
+      if (!std::getline(std::cin, data)) {
+        _running = false;
+        _cv.notify_one();
+        break;
+      }
+      {
+        std::lock_guard<std::mutex> lock(_queueMutex);
+        _commandQueue.push(data);
+      }
+      _cv.notify_one();
     }
-    {
-      std::lock_guard<std::mutex> lock(_queueMutex);
-      _commandQueue.push(data);
-    }
-    _cv.notify_one();
   }
+  _cv.notify_one();
   return Constants::SUCCESS;
 }
 
