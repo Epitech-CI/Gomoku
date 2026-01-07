@@ -752,7 +752,7 @@ bool Brain::Brain::checkTerminator(std::string &payload) {
  * @return std::pair<int, int> A pair containing the evaluation score and the
  * best move index.
  */
-std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
+std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
                                                   bool maximizingPlayer,
                                                   int alpha, int beta) {
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
@@ -774,8 +774,10 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
       return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
-      State newState = applyMove(state, move, 1);
-      int eval = minimax(newState, depth - 1, false, alpha, beta).first;
+      state[move] = 1;
+      int eval = minimax(state, depth - 1, false, alpha, beta).first;
+      state[move] = 0;
+
       if (eval > maxEval) {
         maxEval = eval;
         bestMoveFound = move;
@@ -795,8 +797,10 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State state, int depth,
       return {0, NO_MOVE};
     }
     for (std::size_t move : possibleMoves) {
-      State newState = applyMove(state, move, 2);
-      int eval = minimax(newState, depth - 1, true, alpha, beta).first;
+      state[move] = 2;
+      int eval = minimax(state, depth - 1, true, alpha, beta).first;
+      state[move] = 0;
+
       if (eval < minEval) {
         minEval = eval;
         bestMoveFound = move;
@@ -879,20 +883,6 @@ bool Brain::Brain::checkWinCondition(const State &state, int player) {
     }
   }
   return false;
-}
-
-/**
- * @brief Creates a copy of the board state and applies a move.
- *
- * @param state The original board state.
- * @param move The index where the piece should be placed.
- * @param player The player ID placing the piece.
- * @return State The modified board state.
- */
-State Brain::Brain::applyMove(const State &state, int move, int player) {
-  State newState = state;
-  newState[move] = player;
-  return newState;
 }
 
 /**

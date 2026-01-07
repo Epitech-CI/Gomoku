@@ -66,9 +66,8 @@ namespace Brain {
       void sendCoordinate(int x, int y);
 
       // Algorithm functions
-      std::pair<int, std::size_t> minimax(State state, int depth, bool maximizing, int alpha, int beta);
+      std::pair<int, std::size_t> minimax(State &state, int depth, bool maximizing, int alpha, int beta);
       State getPossibleMoves(const State &state);
-      State applyMove(const State &state, int move, int player);
       bool checkWinCondition(const State &state, int player);
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
