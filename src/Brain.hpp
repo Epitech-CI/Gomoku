@@ -50,8 +50,6 @@ namespace Brain {
       void handleSuggest(const std::string &payload);
       void handleDone(const std::string &payload);
 
-      bool checkTerminator(std::string &payload);
-
       // Multi-threading process
       int inputHandler();
       int logicLoop();
