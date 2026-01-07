@@ -1,12 +1,12 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <queue>
 #include <thread>
 #include <unordered_map>
-#include <functional>
-#include <queue>
-#include <condition_variable>
-#include <mutex>
 #include "Info.hpp"
 #include "Types.hpp"
 
@@ -66,14 +66,14 @@ namespace Brain {
       void sendCoordinate(int x, int y);
 
       // Algorithm functions
-      std::pair<int, std::size_t> minimax(State &state, int depth, bool maximizing, int alpha, int beta);
+      std::pair<int, std::size_t> minimax(State &state, int depth,
+                                          bool maximizing, int alpha, int beta);
       State getPossibleMoves(const State &state);
       bool checkWinCondition(const State &state, int player);
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
       int evaluate(const State &state, int player);
-
-      // Check algorithm return
+      int countPatterns(const State &state, int player);
       bool checkAlgorithmReturn(std::pair<std::size_t, std::size_t> index);
 
     private:

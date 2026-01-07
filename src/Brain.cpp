@@ -1,10 +1,10 @@
 #include "Brain.hpp"
+#include <sys/select.h>
+#include <unistd.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <sys/select.h>
-#include <unistd.h>
 #include "Constants.hpp"
 
 /**
@@ -758,9 +758,9 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
 
   if (checkWinCondition(state, 1)) {
-    return {10000 - (10 - depth), NO_MOVE};
+    return {10000000 - (10 - depth), NO_MOVE};
   } else if (checkWinCondition(state, 2)) {
-    return {-10000 + (10 - depth), NO_MOVE};
+    return {-10000000 + (10 - depth), NO_MOVE};
   } else if (depth == 0 || isBoardFull(state)) {
     return {evaluate(state, 1), NO_MOVE};
   }
@@ -923,27 +923,139 @@ State Brain::Brain::getPossibleMoves(const State &state) {
 /**
  * @brief Evaluates the score of a player on the board.
  *
- * Iterates over the entire board and adds 10 points for each cell occupied by
- * the specified player. This function provides a simple heuristic based on the
- * number of the player's pieces on the board.
- *
  * @param state Current representation of the board.
  * @param player Identifier of the player to evaluate (1 or 2).
- * @return int Total score based on the number of the player's pieces.
+ * @return int Total score based on patterns.
  */
 int Brain::Brain::evaluate(const State &state, int player) {
+  int myScore = countPatterns(state, player);
+  int enemyScore = countPatterns(state, (player == 1) ? 2 : 1);
+  return static_cast<int>(myScore - enemyScore * 1.5);
+}
+
+/**
+ * @brief Calculates a score for a given pattern length (k) and its open ends.
+ *
+ * @param k The length of the consecutive pieces.
+ * @param openStart True if the pattern has an open end at the start.
+ * @param openEnd True if the pattern has an open end at the end.
+ * @return int The calculated score for the pattern.
+ */
+int calculateScore(int k, bool openStart, bool openEnd) {
+  if (k >= 5)
+    return 10000000;
+  if (k == 4) {
+    if (openStart && openEnd)
+      return 100000;
+    if (openStart || openEnd)
+      return 10000;
+  }
+  if (k == 3) {
+    if (openStart && openEnd)
+      return 10000;
+    if (openStart || openEnd)
+      return 1000;
+  }
+  if (k == 2) {
+    if (openStart && openEnd)
+      return 1000;
+    if (openStart || openEnd)
+      return 100;
+  }
+  return 0;
+};
+
+/**
+ * @brief Counts patterns (lines of consecutive pieces) for a given player on the board.
+ * @param state The current board state.
+ * @param player The ID of the player to count patterns for (1 or 2).
+ * @return int The total score from all patterns found for the player.
+ */
+int Brain::Brain::countPatterns(const State &state, int player) {
   int score = 0;
-  int opponent = (player == 1) ? 2 : 1;
-  for (int i = 0; i < _boardSize.second; ++i) {
-    for (int j = 0; j < _boardSize.first; ++j) {
-      int cell = state[i * _boardSize.first + j];
+
+  for (int y = 0; y < _boardSize.second; ++y) {
+    for (int x = 0; x < _boardSize.first;) {
+      int cell = state[y * _boardSize.first + x];
       if (cell == player) {
-        score += 10;
-      } else if (cell == opponent) {
-        score -= 10;
+        int k = 1;
+        while (x + k < _boardSize.first &&
+               state[y * _boardSize.first + (x + k)] == player) {
+          k++;
+        }
+        bool openStart = (x > 0 && state[y * _boardSize.first + (x - 1)] == 0);
+        bool openEnd = (x + k < _boardSize.first &&
+                        state[y * _boardSize.first + (x + k)] == 0);
+        score += calculateScore(k, openStart, openEnd);
+        x += k;
+      } else {
+        x++;
       }
     }
   }
+
+  for (int x = 0; x < _boardSize.first; ++x) {
+    for (int y = 0; y < _boardSize.second;) {
+      int cell = state[y * _boardSize.first + x];
+      if (cell == player) {
+        int k = 1;
+        while (y + k < _boardSize.second &&
+               state[(y + k) * _boardSize.first + x] == player) {
+          k++;
+        }
+        bool openStart = (y > 0 && state[(y - 1) * _boardSize.first + x] == 0);
+        bool openEnd = (y + k < _boardSize.second &&
+                        state[(y + k) * _boardSize.first + x] == 0);
+        score += calculateScore(k, openStart, openEnd);
+        y += k;
+      } else {
+        y++;
+      }
+    }
+  }
+
+  for (int y = 0; y < _boardSize.second; ++y) {
+    for (int x = 0; x < _boardSize.first; ++x) {
+      if (state[y * _boardSize.first + x] == player) {
+        if (x > 0 && y > 0 &&
+            state[(y - 1) * _boardSize.first + (x - 1)] == player) {
+          continue;
+        }
+        int k = 0;
+        while (y + k < _boardSize.second && x + k < _boardSize.first &&
+               state[(y + k) * _boardSize.first + (x + k)] == player) {
+          k++;
+        }
+        bool openStart = (x > 0 && y > 0 &&
+                          state[(y - 1) * _boardSize.first + (x - 1)] == 0);
+        bool openEnd = (x + k < _boardSize.first && y + k < _boardSize.second &&
+                        state[(y + k) * _boardSize.first + (x + k)] == 0);
+        score += calculateScore(k, openStart, openEnd);
+      }
+    }
+  }
+
+  for (int y = 0; y < _boardSize.second; ++y) {
+    for (int x = 0; x < _boardSize.first; ++x) {
+      if (state[y * _boardSize.first + x] == player) {
+        if (x < _boardSize.first - 1 && y > 0 &&
+            state[(y - 1) * _boardSize.first + (x + 1)] == player) {
+          continue;
+        }
+        int k = 0;
+        while (y + k < _boardSize.second && x - k >= 0 &&
+               state[(y + k) * _boardSize.first + (x - k)] == player) {
+          k++;
+        }
+        bool openStart = (x < _boardSize.first - 1 && y > 0 &&
+                          state[(y - 1) * _boardSize.first + (x + 1)] == 0);
+        bool openEnd = (x - k >= 0 && y + k < _boardSize.second &&
+                        state[(y + k) * _boardSize.first + (x - k)] == 0);
+        score += calculateScore(k, openStart, openEnd);
+      }
+    }
+  }
+
   return score;
 }
 
