@@ -257,16 +257,7 @@ void Brain::Brain::handleTurn(const std::string &payload) {
     sendError("Error parsing TURN command payload");
     return;
   }
-  auto result =
-      minimax(_goban, Constants::DEPTH_LEVEL, true,
-              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
-  if (result.second != std::numeric_limits<std::size_t>::max()) {
-    _goban[result.second] = 1;
-    sendCoordinate(result.second % _boardSize.first,
-                   result.second / _boardSize.first);
-  } else {
-    sendError("No valid move found");
-  }
+  findBestMove();
 }
 
 /**
@@ -576,17 +567,7 @@ void Brain::Brain::handleSuggest(const std::string &payload) {
 void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   boardIsActivated = false;
-  auto result =
-      minimax(_goban, Constants::DEPTH_LEVEL, true,
-              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
-  if (result.second >= _goban.size() || result.second < 0) {
-    sendError("Minimax returned invalid move index: " +
-              std::to_string(result.second));
-    return;
-  }
-  _goban[result.second] = 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
+  findBestMove();
 }
 
 /**
@@ -631,6 +612,43 @@ void Brain::Brain::initializeCommands() {
   };
 }
 
+void Brain::Brain::findBestMove() {
+  _startTime = std::chrono::steady_clock::now();
+  _timeUp = false;
+  std::pair<int, std::size_t> bestMove = {
+      std::numeric_limits<int>::min(),
+      std::numeric_limits<std::size_t>::max()};
+
+  try {
+    for (int depth = 1; depth <= Constants::DEPTH_LEVEL; ++depth) {
+      auto currentMove =
+          minimax(_goban, depth, true, std::numeric_limits<int>::min(),
+                  std::numeric_limits<int>::max());
+      if (!_timeUp) {
+        bestMove = currentMove;
+      } else {
+        break;
+      }
+    }
+  } catch (const std::runtime_error &e) {
+  }
+
+  if (bestMove.second != std::numeric_limits<std::size_t>::max()) {
+    _goban[bestMove.second] = 1;
+    sendCoordinate(bestMove.second % _boardSize.first,
+                   bestMove.second / _boardSize.first);
+  } else {
+    State possibleMoves = getPossibleMoves(_goban);
+    if (!possibleMoves.empty()) {
+      std::size_t move = possibleMoves[0];
+      _goban[move] = 1;
+      sendCoordinate(move % _boardSize.first, move / _boardSize.first);
+    } else {
+      sendError("No valid move found");
+    }
+  }
+}
+
 /**
  * @brief Core AI algorithm for determining the best move.
  *
@@ -649,6 +667,14 @@ void Brain::Brain::initializeCommands() {
 std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
                                                   bool maximizingPlayer,
                                                   int alpha, int beta) {
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     std::chrono::steady_clock::now() - _startTime)
+                     .count();
+  if (elapsed > Constants::MAX_TIME_LEFT) {
+    _timeUp = true;
+    throw std::runtime_error("Time is up");
+  }
+
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
 
   if (checkWinCondition(state, 1)) {
@@ -658,9 +684,8 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   } else if (depth == 0 || isBoardFull(state)) {
     return {evaluate(state, 1), NO_MOVE};
   }
-
-  std::size_t bestMoveFound = NO_MOVE;
   State possibleMoves = getPossibleMoves(state);
+  std::size_t bestMove = NO_MOVE;
 
   if (possibleMoves.empty()) {
     return {0, NO_MOVE};
@@ -675,16 +700,16 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
 
       if (eval > maxEval) {
         maxEval = eval;
-        bestMoveFound = move;
+        bestMove = move;
       }
       alpha = std::max(alpha, eval);
       if (beta <= alpha) {
         break;
       }
     }
-    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
-      bestMoveFound = possibleMoves[0];
-    return {maxEval, bestMoveFound};
+    if (bestMove == NO_MOVE && !possibleMoves.empty())
+      bestMove = possibleMoves[0];
+    return {maxEval, bestMove};
   } else {
     int minEval = std::numeric_limits<int>::max();
     for (std::size_t move : possibleMoves) {
@@ -694,16 +719,16 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
 
       if (eval < minEval) {
         minEval = eval;
-        bestMoveFound = move;
+        bestMove = move;
       }
       beta = std::min(beta, eval);
       if (beta <= alpha) {
         break;
       }
     }
-    if (bestMoveFound == NO_MOVE && !possibleMoves.empty())
-      bestMoveFound = possibleMoves[0];
-    return {minEval, bestMoveFound};
+    if (bestMove == NO_MOVE && !possibleMoves.empty())
+      bestMove = possibleMoves[0];
+    return {minEval, bestMove};
   }
 }
 
