@@ -119,6 +119,12 @@ int Brain::Brain::inputHandler() {
         _cv.notify_one();
         break;
       }
+      size_t end = data.find_last_not_of("\r\n\t ");
+      if (end != std::string::npos) {
+        data = data.substr(0, end + 1);
+      } else {
+        data.clear();
+      }
       {
         std::lock_guard<std::mutex> lock(_queueMutex);
         _commandQueue.push(data);
@@ -209,11 +215,6 @@ void Brain::Brain::sendCoordinate(int x, int y) {
  */
 void Brain::Brain::handleStart(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "START command received with empty payload or missing terminators.");
-    return;
-  }
   std::stringstream ss(command);
   int boardSize;
   try {
@@ -241,11 +242,6 @@ void Brain::Brain::handleStart(const std::string &payload) {
  */
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "TURN command received with empty payload or missing terminators.");
-    return;
-  }
   command[command.find(',')] = ' ';
   std::stringstream ss(command);
   int x, y;
@@ -282,11 +278,6 @@ void Brain::Brain::handleTurn(const std::string &payload) {
  */
 void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "BEGIN command received with empty payload or missing terminators.");
-    return;
-  }
   auto middle =
       (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
   _goban[middle] = 1;
@@ -302,11 +293,6 @@ void Brain::Brain::handleBegin(const std::string &payload) {
  */
 void Brain::Brain::handleBoard(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "BOARD command received with empty payload or missing terminators.");
-    return;
-  }
   for (char &ch : command) {
     if (ch == ',') {
       ch = ' ';
@@ -338,11 +324,6 @@ void Brain::Brain::handleBoard(const std::string &payload) {
  */
 void Brain::Brain::handleInfo(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "INFO command received with empty payload or missing terminators.");
-    return;
-  }
   std::stringstream ss(command);
   std::string key;
   int value;
@@ -392,11 +373,6 @@ void Brain::Brain::handleInfo(const std::string &payload) {
  */
 void Brain::Brain::handleEnd(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "END command received with empty payload or missing terminators.");
-    return;
-  }
   _running = false;
 }
 
@@ -409,12 +385,9 @@ void Brain::Brain::handleEnd(const std::string &payload) {
  */
 void Brain::Brain::handleAbout(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "ABOUT command received with empty payload or missing terminators.");
-    return;
-  }
-  sendResponse(Constants::ABOUT);
+  sendResponse(
+      "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
+      "country=\"France\"");
 }
 
 /**
@@ -429,11 +402,6 @@ void Brain::Brain::handleAbout(const std::string &payload) {
  */
 void Brain::Brain::handleRecstart(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "RECSTART command received with empty payload or missing terminators.");
-    return;
-  }
   command[command.find(',')] = ' ';
   std::stringstream ss(command);
   int width, height;
@@ -466,11 +434,6 @@ void Brain::Brain::handleRecstart(const std::string &payload) {
  */
 void Brain::Brain::handleRestart(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "RESTART command received with empty payload or missing terminators.");
-    return;
-  }
   try {
     std::fill(_goban.begin(), _goban.end(), 0);
   } catch (...) {
@@ -491,12 +454,6 @@ void Brain::Brain::handleRestart(const std::string &payload) {
  */
 void Brain::Brain::handleTakeback(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "TAKEBACK command received with empty payload or missing terminators.");
-    return;
-  }
-
   std::stringstream ss(command);
   int x, y;
   try {
@@ -525,11 +482,6 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
  */
 void Brain::Brain::handlePlay(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "PLAY command received with empty payload or missing terminators.");
-    return;
-  }
   size_t comma_pos = command.find(',');
   if (comma_pos == std::string::npos) {
     sendError("PLAY command malformed: expected format 'X,Y'");
@@ -566,12 +518,6 @@ void Brain::Brain::handlePlay(const std::string &payload) {
  */
 void Brain::Brain::handleSwap2Board(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "SWAP2BOARD command received with empty payload or missing "
-        "terminators.");
-    return;
-  }
 }
 
 /**
@@ -581,11 +527,6 @@ void Brain::Brain::handleSwap2Board(const std::string &payload) {
  */
 void Brain::Brain::handleError(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "ERROR command received with empty payload or missing terminators.");
-    return;
-  }
 }
 
 /**
@@ -595,11 +536,6 @@ void Brain::Brain::handleError(const std::string &payload) {
  */
 void Brain::Brain::handleUnknown(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "UNKNOWN command received with empty payload or missing terminators.");
-    return;
-  }
 }
 
 /**
@@ -609,11 +545,6 @@ void Brain::Brain::handleUnknown(const std::string &payload) {
  */
 void Brain::Brain::handleMessage(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "MESSAGE command received with empty payload or missing terminators.");
-    return;
-  }
 }
 
 /**
@@ -623,11 +554,6 @@ void Brain::Brain::handleMessage(const std::string &payload) {
  */
 void Brain::Brain::handleDebug(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "DEBUG command received with empty payload or missing terminators.");
-    return;
-  }
 }
 
 /**
@@ -637,11 +563,6 @@ void Brain::Brain::handleDebug(const std::string &payload) {
  */
 void Brain::Brain::handleSuggest(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "SUGGEST command received with empty payload or missing terminators.");
-    return;
-  }
 }
 
 /**
@@ -654,11 +575,6 @@ void Brain::Brain::handleSuggest(const std::string &payload) {
  */
 void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
-  if (checkTerminator(command) == false) {
-    sendError(
-        "DONE command received with empty payload or missing terminators.");
-    return;
-  }
   boardIsActivated = false;
   auto result =
       minimax(_goban, Constants::DEPTH_LEVEL, true,
@@ -713,30 +629,6 @@ void Brain::Brain::initializeCommands() {
   _commands["SUGGEST"] = [this](const std::string &p) {
     this->handleSuggest(p);
   };
-}
-
-/**
- * @brief Checks and strips the command terminator (CR/LF).
- *
- * Verifies if the payload ends with a valid terminator (\r or \n).
- * If valid, it strips the terminator from the string.
- *
- * @param payload The command string to check and modify.
- * @return true If a valid terminator was found and removed.
- * @return false If no terminator was found.
- */
-bool Brain::Brain::checkTerminator(std::string &payload) {
-  if (payload[payload.size() - 1] == 0x0d ||
-      payload[payload.size() - 1] == 0x0a) {
-    size_t end = payload.find_last_not_of("\r\n\t ");
-    if (end != std::string::npos) {
-      payload = payload.substr(0, end + 1);
-    } else {
-      payload.clear();
-    }
-    return true;
-  }
-  return false;
 }
 
 /**
