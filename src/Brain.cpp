@@ -766,13 +766,14 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   }
 
   std::size_t bestMoveFound = NO_MOVE;
+  State possibleMoves = getPossibleMoves(state);
+
+  if (possibleMoves.empty()) {
+    return {0, NO_MOVE};
+  }
 
   if (maximizingPlayer) {
     int maxEval = std::numeric_limits<int>::min();
-    State possibleMoves = getPossibleMoves(state);
-    if (possibleMoves.empty()) {
-      return {0, NO_MOVE};
-    }
     for (std::size_t move : possibleMoves) {
       state[move] = 1;
       int eval = minimax(state, depth - 1, false, alpha, beta).first;
@@ -792,10 +793,6 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
     return {maxEval, bestMoveFound};
   } else {
     int minEval = std::numeric_limits<int>::max();
-    State possibleMoves = getPossibleMoves(state);
-    if (possibleMoves.empty()) {
-      return {0, NO_MOVE};
-    }
     for (std::size_t move : possibleMoves) {
       state[move] = 2;
       int eval = minimax(state, depth - 1, true, alpha, beta).first;
