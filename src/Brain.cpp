@@ -40,20 +40,22 @@ int Brain::Brain::stop() {
 /**
  * @brief Main logic loop of the engine.
  *
- * Continuously retrieves and processes commands from the internal command queue
- * while the engine is running.
+ * Continuously retrieves and processes commands from the internal command queue.
+ * It continues until the engine is stopped AND the queue is empty.
  *
  * @return int SUCCESS status code.
  */
 int Brain::Brain::logicLoop() {
-  while (_running) {
+  while (true) {
     std::string payload;
     bool doesMessageExist = false;
     {
       std::unique_lock<std::mutex> lock(_queueMutex);
       _cv.wait(lock, [this] { return !_commandQueue.empty() || !_running; });
-      if (!_running)
+      if (!_running && _commandQueue.empty())
         break;
+      if (_commandQueue.empty())
+        continue;
       payload = _commandQueue.front();
       _commandQueue.pop();
     }
@@ -726,7 +728,7 @@ void Brain::Brain::initializeCommands() {
 bool Brain::Brain::checkTerminator(std::string &payload) {
   if (payload[payload.size() - 1] == 0x0d ||
       payload[payload.size() - 1] == 0x0a) {
-    size_t end = payload.find_last_not_of("\r\n");
+    size_t end = payload.find_last_not_of("\r\n\t ");
     if (end != std::string::npos) {
       payload = payload.substr(0, end + 1);
     } else {
