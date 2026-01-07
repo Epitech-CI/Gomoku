@@ -119,12 +119,6 @@ int Brain::Brain::inputHandler() {
         _cv.notify_one();
         break;
       }
-      size_t npos = data.find_last_not_of(" \n\r\t\f\v");
-      if (npos) {
-        data.erase(npos + 1);
-      } else {
-        data.clear();
-      }
       {
         std::lock_guard<std::mutex> lock(_queueMutex);
         _commandQueue.push(data);
@@ -736,7 +730,7 @@ void Brain::Brain::initializeCommands() {
 bool Brain::Brain::checkTerminator(std::string &payload) {
   if (payload[payload.size() - 1] == 0x0d ||
       payload[payload.size() - 1] == 0x0a) {
-    size_t end = payload.find_last_not_of("\r\n");
+    size_t end = payload.find_last_not_of("\r\n\t ");
     if (end != std::string::npos) {
       payload = payload.substr(0, end + 1);
     } else {
