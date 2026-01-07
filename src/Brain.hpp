@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -17,6 +18,7 @@ namespace Brain {
     PLAYER_TWO_WIN,
     DRAW
   };
+
   class Brain {
     public:
       Brain() = default;
@@ -64,6 +66,7 @@ namespace Brain {
       void sendCoordinate(int x, int y);
 
       // Algorithm functions
+      void findBestMove();
       std::pair<int, std::size_t> minimax(State &state, int depth,
                                           bool maximizing, int alpha, int beta);
       State getPossibleMoves(const State &state);
@@ -88,5 +91,7 @@ namespace Brain {
       std::mutex _queueMutex;
       std::mutex _responseMutex;
       std::condition_variable _cv;
+      std::chrono::steady_clock::time_point _startTime;
+      bool _timeUp{false};
   };
 }  // namespace Brain
