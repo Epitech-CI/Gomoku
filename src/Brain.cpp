@@ -554,6 +554,41 @@ void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   boardIsActivated = false;
   findBestMove();
+
+  int ones = 0;
+  int twos = 0;
+  for (int cell : _goban) {
+    if (cell == 1) ones++;
+    else if (cell == 2) twos++;
+  }
+
+  bool swap = (ones > twos);
+  if (swap) {
+    for (auto &cell : _goban) {
+      if (cell == 1) cell = 2;
+      else if (cell == 2) cell = 1;
+    }
+  }
+
+  auto result =
+      minimax(_goban, Constants::DEPTH_LEVEL, true,
+              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+
+  if (swap) {
+    for (auto &cell : _goban) {
+      if (cell == 1) cell = 2;
+      else if (cell == 2) cell = 1;
+    }
+  }
+
+  if (result.second >= _goban.size() || result.second < 0) {
+    sendError("Minimax returned invalid move index: " +
+              std::to_string(result.second));
+    return;
+  }
+  _goban[result.second] = swap ? 2 : 1;
+  sendCoordinate(result.second % _boardSize.first,
+                 result.second / _boardSize.first);
 }
 
 /**
