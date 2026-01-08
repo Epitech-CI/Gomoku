@@ -100,26 +100,8 @@ int Brain::Brain::logicLoop() {
  */
 int Brain::Brain::inputHandler() {
   std::string data;
-  _running = true;
-
   while (_running) {
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds);
-
-    struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 100000;
-
-    int ret = select(STDIN_FILENO + 1, &fds, nullptr, nullptr, &timeout);
-    if (ret == -1) {
-      break;
-    } else if (ret > 0) {
-      if (!std::getline(std::cin, data)) {
-        _running = false;
-        _cv.notify_one();
-        break;
-      }
+    if (std::getline(std::cin, data)) {
       size_t end = data.find_last_not_of("\r\n\t ");
       if (end != std::string::npos) {
         data = data.substr(0, end + 1);
@@ -131,9 +113,12 @@ int Brain::Brain::inputHandler() {
         _commandQueue.push(data);
       }
       _cv.notify_one();
+    } else {
+      _running = false;
+      _cv.notify_one();
+      break;
     }
   }
-  _cv.notify_one();
   return Constants::SUCCESS;
 }
 
