@@ -832,6 +832,7 @@ bool Brain::Brain::checkWinCondition(const State &state, int player, std::size_t
     }
     if (count >= 5) return true;
   }
+
   return false;
 }
 
@@ -874,19 +875,6 @@ State Brain::Brain::getPossibleMoves(const State &state) {
 }
 
 /**
- * @brief Evaluates the score of a player on the board.
- *
- * @param state Current representation of the board.
- * @param player Identifier of the player to evaluate (1 or 2).
- * @return int Total score based on patterns.
- */
-int Brain::Brain::evaluate(const State &state, int player) {
-  int myScore = countPatterns(state, player);
-  int enemyScore = countPatterns(state, (player == 1) ? 2 : 1);
-  return static_cast<int>(myScore - enemyScore * 1.5);
-}
-
-/**
  * @brief Calculates a score for a given pattern length (k) and its open ends.
  *
  * @param k The length of the consecutive pieces.
@@ -919,27 +907,29 @@ int calculateScore(int k, bool openStart, bool openEnd) {
 };
 
 /**
- * @brief Counts patterns (lines of consecutive pieces) for a given player on the board.
- * @param state The current board state.
- * @param player The ID of the player to count patterns for (1 or 2).
- * @return int The total score from all patterns found for the player.
+ * @brief Evaluates the score of a player on the board.
+ *
+ * @param state Current representation of the board.
+ * @param player Identifier of the player to evaluate (1 or 2).
+ * @return int Total score based on patterns.
  */
-int Brain::Brain::countPatterns(const State &state, int player) {
-  int score = 0;
+int Brain::Brain::evaluate(const State &state, int player) {
+  int scores[3] = {0, 0, 0};
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first;) {
       int cell = state[y * _boardSize.first + x];
-      if (cell == player) {
+      if (cell != 0) {
+        int p = cell;
         int k = 1;
         while (x + k < _boardSize.first &&
-               state[y * _boardSize.first + (x + k)] == player) {
+               state[y * _boardSize.first + (x + k)] == p) {
           k++;
         }
         bool openStart = (x > 0 && state[y * _boardSize.first + (x - 1)] == 0);
         bool openEnd = (x + k < _boardSize.first &&
                         state[y * _boardSize.first + (x + k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
         x += k;
       } else {
         x++;
@@ -948,18 +938,19 @@ int Brain::Brain::countPatterns(const State &state, int player) {
   }
 
   for (int x = 0; x < _boardSize.first; ++x) {
-    for (int y = 0; y < _boardSize.second;) {
+    for (int y = 0; y < _boardSize.second; ) {
       int cell = state[y * _boardSize.first + x];
-      if (cell == player) {
+      if (cell != 0) {
+        int p = cell;
         int k = 1;
         while (y + k < _boardSize.second &&
-               state[(y + k) * _boardSize.first + x] == player) {
+               state[(y + k) * _boardSize.first + x] == p) {
           k++;
         }
         bool openStart = (y > 0 && state[(y - 1) * _boardSize.first + x] == 0);
         bool openEnd = (y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + x] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
         y += k;
       } else {
         y++;
@@ -969,47 +960,53 @@ int Brain::Brain::countPatterns(const State &state, int player) {
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first; ++x) {
-      if (state[y * _boardSize.first + x] == player) {
+      int cell = state[y * _boardSize.first + x];
+      if (cell != 0) {
+        int p = cell;
         if (x > 0 && y > 0 &&
-            state[(y - 1) * _boardSize.first + (x - 1)] == player) {
+            state[(y - 1) * _boardSize.first + (x - 1)] == p) {
           continue;
         }
-        int k = 0;
+        int k = 1;
         while (y + k < _boardSize.second && x + k < _boardSize.first &&
-               state[(y + k) * _boardSize.first + (x + k)] == player) {
+               state[(y + k) * _boardSize.first + (x + k)] == p) {
           k++;
         }
         bool openStart = (x > 0 && y > 0 &&
                           state[(y - 1) * _boardSize.first + (x - 1)] == 0);
         bool openEnd = (x + k < _boardSize.first && y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + (x + k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
       }
     }
   }
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first; ++x) {
-      if (state[y * _boardSize.first + x] == player) {
+      int cell = state[y * _boardSize.first + x];
+      if (cell != 0) {
+        int p = cell;
         if (x < _boardSize.first - 1 && y > 0 &&
-            state[(y - 1) * _boardSize.first + (x + 1)] == player) {
+            state[(y - 1) * _boardSize.first + (x + 1)] == p) {
           continue;
         }
-        int k = 0;
+        int k = 1;
         while (y + k < _boardSize.second && x - k >= 0 &&
-               state[(y + k) * _boardSize.first + (x - k)] == player) {
+               state[(y + k) * _boardSize.first + (x - k)] == p) {
           k++;
         }
         bool openStart = (x < _boardSize.first - 1 && y > 0 &&
                           state[(y - 1) * _boardSize.first + (x + 1)] == 0);
         bool openEnd = (x - k >= 0 && y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + (x - k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
       }
     }
   }
 
-  return score;
+  int myScore = scores[player];
+  int enemyScore = scores[(player == 1) ? 2 : 1];
+  return static_cast<int>(myScore - enemyScore * 1.5);
 }
 
 /**

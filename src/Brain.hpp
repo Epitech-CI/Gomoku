@@ -77,7 +77,6 @@ namespace Brain {
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
       int evaluate(const State &state, int player);
-      int countPatterns(const State &state, int player);
       bool checkAlgorithmReturn(std::pair<std::size_t, std::size_t> index);
 
     private:
