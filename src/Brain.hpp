@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <limits>
 #include <condition_variable>
 #include <functional>
 #include <mutex>
@@ -68,7 +69,8 @@ namespace Brain {
       // Algorithm functions
       void findBestMove();
       std::pair<int, std::size_t> minimax(State &state, int depth,
-                                          bool maximizing, int alpha, int beta);
+                                          bool maximizing, int alpha, int beta,
+                                          std::size_t priorityMove = std::numeric_limits<std::size_t>::max());
       State getPossibleMoves(const State &state);
       bool checkWinCondition(const State &state, int player);
       bool isBoardFull(const State &state);

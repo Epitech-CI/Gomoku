@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include <algorithm>
 #include <sys/select.h>
 #include <unistd.h>
 #include <fstream>
@@ -554,41 +555,6 @@ void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   boardIsActivated = false;
   findBestMove();
-
-  int ones = 0;
-  int twos = 0;
-  for (int cell : _goban) {
-    if (cell == 1) ones++;
-    else if (cell == 2) twos++;
-  }
-
-  bool swap = (ones > twos);
-  if (swap) {
-    for (auto &cell : _goban) {
-      if (cell == 1) cell = 2;
-      else if (cell == 2) cell = 1;
-    }
-  }
-
-  auto result =
-      minimax(_goban, Constants::DEPTH_LEVEL, true,
-              std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
-
-  if (swap) {
-    for (auto &cell : _goban) {
-      if (cell == 1) cell = 2;
-      else if (cell == 2) cell = 1;
-    }
-  }
-
-  if (result.second >= _goban.size() || result.second < 0) {
-    sendError("Minimax returned invalid move index: " +
-              std::to_string(result.second));
-    return;
-  }
-  _goban[result.second] = swap ? 2 : 1;
-  sendCoordinate(result.second % _boardSize.first,
-                 result.second / _boardSize.first);
 }
 
 /**
@@ -639,14 +605,16 @@ void Brain::Brain::findBestMove() {
   std::pair<int, std::size_t> bestMove = {
       std::numeric_limits<int>::min(),
       std::numeric_limits<std::size_t>::max()};
+  std::size_t lastBestMove = std::numeric_limits<std::size_t>::max();
 
   try {
     for (int depth = 1; depth <= Constants::DEPTH_LEVEL; ++depth) {
       auto currentMove =
           minimax(_goban, depth, true, std::numeric_limits<int>::min(),
-                  std::numeric_limits<int>::max());
+                  std::numeric_limits<int>::max(), lastBestMove);
       if (!_timeUp) {
         bestMove = currentMove;
+        lastBestMove = bestMove.second;
       } else {
         break;
       }
@@ -687,7 +655,8 @@ void Brain::Brain::findBestMove() {
  */
 std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
                                                   bool maximizingPlayer,
-                                                  int alpha, int beta) {
+                                                  int alpha, int beta,
+                                                  std::size_t priorityMove) {
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::steady_clock::now() - _startTime)
                      .count();
@@ -710,6 +679,13 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
 
   if (possibleMoves.empty()) {
     return {0, NO_MOVE};
+  }
+
+  if (priorityMove != NO_MOVE) {
+    auto it = std::find(possibleMoves.begin(), possibleMoves.end(), priorityMove);
+    if (it != possibleMoves.end()) {
+      std::iter_swap(possibleMoves.begin(), it);
+    }
   }
 
   if (maximizingPlayer) {
