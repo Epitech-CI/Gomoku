@@ -633,6 +633,9 @@ void Brain::Brain::findBestMove() {
       if (!_timeUp) {
         bestMove = currentMove;
         lastBestMove = bestMove.second;
+        if (bestMove.first >= 9000000) {
+          break;
+        }
       } else {
         break;
       }
