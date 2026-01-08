@@ -230,7 +230,10 @@ void Brain::Brain::handleStart(const std::string &payload) {
  */
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
-  command[command.find(',')] = ' ';
+  size_t commaPos = command.find(',');
+  if (commaPos != std::string::npos)
+    command[commaPos] = ' ';
+
   std::stringstream ss(command);
   int x, y;
   try {
@@ -476,7 +479,7 @@ void Brain::Brain::handlePlay(const std::string &payload) {
     sendError("PLAY command malformed: expected format 'X,Y'");
     return;
   }
-  command[comma_pos] = ' ';
+  if (comma_pos != std::string::npos) command[comma_pos] = ' ';
   std::stringstream ss(command);
   int x, y;
   try {
