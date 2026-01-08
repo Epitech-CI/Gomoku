@@ -217,6 +217,7 @@ void Brain::Brain::handleStart(const std::string &payload) {
     return;
   }
   sendOk();
+  _aiPlayer = 1;
 }
 
 /**
@@ -239,7 +240,15 @@ void Brain::Brain::handleTurn(const std::string &payload) {
                 std::to_string(y) + ")");
       return;
     }
-    _goban[y * _boardSize.first + x] = 2;
+    int stones1 = 0;
+    int stones2 = 0;
+    for (int cell : _goban) {
+      if (cell == 1) stones1++;
+      else if (cell == 2) stones2++;
+    }
+    _aiPlayer = (stones1 == stones2) ? 2 : 1;
+    int opponent = (_aiPlayer == 1) ? 2 : 1;
+    _goban[y * _boardSize.first + x] = opponent;
   } catch (...) {
     sendError("Error parsing TURN command payload");
     return;
@@ -258,7 +267,8 @@ void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
   auto middle =
       (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
-  _goban[middle] = 1;
+  _aiPlayer = 1;
+  _goban[middle] = _aiPlayer;
   sendCoordinate(middle % _boardSize.first, middle / _boardSize.first);
 }
 
@@ -419,6 +429,7 @@ void Brain::Brain::handleRestart(const std::string &payload) {
     return;
   }
   sendOk();
+  _aiPlayer = 1;
 }
 
 /**
@@ -485,7 +496,7 @@ void Brain::Brain::handlePlay(const std::string &payload) {
               std::to_string(y) + ") is already occupied");
     return;
   }
-  _goban[cellIndex] = 1;
+  _goban[cellIndex] = _aiPlayer;
   sendCoordinate(x, y);
 }
 
@@ -554,6 +565,13 @@ void Brain::Brain::handleSuggest(const std::string &payload) {
 void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   boardIsActivated = false;
+  int stones1 = 0;
+  int stones2 = 0;
+  for (int cell : _goban) {
+    if (cell == 1) stones1++;
+    else if (cell == 2) stones2++;
+  }
+  _aiPlayer = (stones1 > stones2) ? 2 : 1;
   findBestMove();
 }
 
@@ -623,14 +641,14 @@ void Brain::Brain::findBestMove() {
   }
 
   if (bestMove.second != std::numeric_limits<std::size_t>::max()) {
-    _goban[bestMove.second] = 1;
+    _goban[bestMove.second] = _aiPlayer;
     sendCoordinate(bestMove.second % _boardSize.first,
                    bestMove.second / _boardSize.first);
   } else {
     State possibleMoves = getPossibleMoves(_goban);
     if (!possibleMoves.empty()) {
       std::size_t move = possibleMoves[0];
-      _goban[move] = 1;
+      _goban[move] = _aiPlayer;
       sendCoordinate(move % _boardSize.first, move / _boardSize.first);
     } else {
       sendError("No valid move found");
@@ -667,25 +685,26 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   }
 
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
+  int opponent = (_aiPlayer == 1) ? 2 : 1;
 
   if (lastMove != NO_MOVE) {
     if (maximizingPlayer) {
-      if (checkWinCondition(state, 2, lastMove))
+      if (checkWinCondition(state, opponent, lastMove))
         return {-10000000 + (10 - depth), NO_MOVE};
     } else {
-      if (checkWinCondition(state, 1, lastMove))
+      if (checkWinCondition(state, _aiPlayer, lastMove))
         return {10000000 - (10 - depth), NO_MOVE};
     }
   } else {
-    if (checkWinCondition(state, 1)) {
+    if (checkWinCondition(state, _aiPlayer)) {
       return {10000000 - (10 - depth), NO_MOVE};
-    } else if (checkWinCondition(state, 2)) {
+    } else if (checkWinCondition(state, opponent)) {
       return {-10000000 + (10 - depth), NO_MOVE};
     }
   }
 
   if (depth == 0 || isBoardFull(state)) {
-    return {evaluate(state, 1), NO_MOVE};
+    return {evaluate(state, _aiPlayer), NO_MOVE};
   }
   State possibleMoves = getPossibleMoves(state);
   std::size_t bestMove = NO_MOVE;
@@ -704,7 +723,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   if (maximizingPlayer) {
     int maxEval = std::numeric_limits<int>::min();
     for (std::size_t move : possibleMoves) {
-      state[move] = 1;
+      state[move] = _aiPlayer;
       int eval = minimax(state, depth - 1, false, alpha, beta, NO_MOVE, move).first;
       state[move] = 0;
 
@@ -723,7 +742,7 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   } else {
     int minEval = std::numeric_limits<int>::max();
     for (std::size_t move : possibleMoves) {
-      state[move] = 2;
+      state[move] = opponent;
       int eval = minimax(state, depth - 1, true, alpha, beta, NO_MOVE, move).first;
       state[move] = 0;
 

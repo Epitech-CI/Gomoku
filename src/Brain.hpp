@@ -81,6 +81,7 @@ namespace Brain {
 
     private:
       Info info;
+      int _aiPlayer{1};
       bool boardIsActivated{false};
       std::pair<int, int> _boardSize{0, 0};
       State _goban;
