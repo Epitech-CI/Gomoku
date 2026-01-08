@@ -70,9 +70,10 @@ namespace Brain {
       void findBestMove();
       std::pair<int, std::size_t> minimax(State &state, int depth,
                                           bool maximizing, int alpha, int beta,
-                                          std::size_t priorityMove = std::numeric_limits<std::size_t>::max());
+                                          std::size_t priorityMove = std::numeric_limits<std::size_t>::max(),
+                                          std::size_t lastMove = std::numeric_limits<std::size_t>::max());
       State getPossibleMoves(const State &state);
-      bool checkWinCondition(const State &state, int player);
+      bool checkWinCondition(const State &state, int player, std::size_t lastMove = std::numeric_limits<std::size_t>::max());
       bool isBoardFull(const State &state);
       bool hasNeighbor(const State &state, int index, int range);
       int evaluate(const State &state, int player);
