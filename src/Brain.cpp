@@ -249,9 +249,10 @@ void Brain::Brain::handleTurn(const std::string &payload) {
       if (cell == 1) stones1++;
       else if (cell == 2) stones2++;
     }
-    _aiPlayer = (stones1 == stones2) ? 2 : 1;
-    int opponent = (_aiPlayer == 1) ? 2 : 1;
+    int opponent = (stones1 == stones2) ? 1 : 2;
     _goban[y * _boardSize.first + x] = opponent;
+    if (opponent == 1) stones1++; else stones2++;
+    _aiPlayer = (stones1 > stones2) ? 2 : 1;
   } catch (...) {
     sendError("Error parsing TURN command payload");
     return;
@@ -432,7 +433,13 @@ void Brain::Brain::handleRestart(const std::string &payload) {
     return;
   }
   sendOk();
-  _aiPlayer = 1;
+  int stones1 = 0;
+  int stones2 = 0;
+  for (int cell : _goban) {
+    if (cell == 1) stones1++;
+    else if (cell == 2) stones2++;
+  }
+  _aiPlayer = (stones1 > stones2) ? 2 : 1;
 }
 
 /**
@@ -456,6 +463,13 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
       return;
     }
     _goban[y * _boardSize.first + x] = 0;
+    int stones1 = 0;
+    int stones2 = 0;
+    for (int cell : _goban) {
+      if (cell == 1) stones1++;
+      else if (cell == 2) stones2++;
+    }
+    _aiPlayer = (stones1 > stones2) ? 2 : 1;
   } catch (...) {
     sendError("Error parsing TAKEBACK command payload: " + command);
     return;
