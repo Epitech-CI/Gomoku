@@ -365,7 +365,7 @@ void Brain::Brain::handleInfo(const std::string &payload) {
  */
 void Brain::Brain::handleEnd(const std::string &payload) {
   std::string command = payload;
-  _running = false;
+  exit(0);
 }
 
 /**
