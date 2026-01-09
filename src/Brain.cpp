@@ -47,7 +47,7 @@ int Brain::Brain::stop() {
  */
 int Brain::Brain::inputHandler() {
   std::string data;
-  while (std::getline(std::cin, data)) {
+  while (_running && std::getline(std::cin, data)) {
     bool doesMessageExist = false;
     size_t end = data.find_last_not_of("\r\n\t ");
     if (end != std::string::npos) {
