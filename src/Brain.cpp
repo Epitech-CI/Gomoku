@@ -1,4 +1,5 @@
 #include "Brain.hpp"
+#include <algorithm>
 #include <sys/select.h>
 #include <unistd.h>
 #include <fstream>
@@ -180,6 +181,7 @@ void Brain::Brain::handleStart(const std::string &payload) {
     return;
   }
   sendOk();
+  _aiPlayer = 1;
 }
 
 /**
@@ -192,7 +194,10 @@ void Brain::Brain::handleStart(const std::string &payload) {
  */
 void Brain::Brain::handleTurn(const std::string &payload) {
   std::string command = payload;
-  command[command.find(',')] = ' ';
+  size_t commaPos = command.find(',');
+  if (commaPos != std::string::npos)
+    command[commaPos] = ' ';
+
   std::stringstream ss(command);
   int x, y;
   try {
@@ -202,7 +207,16 @@ void Brain::Brain::handleTurn(const std::string &payload) {
                 std::to_string(y) + ")");
       return;
     }
-    _goban[y * _boardSize.first + x] = 2;
+    int stones1 = 0;
+    int stones2 = 0;
+    for (int cell : _goban) {
+      if (cell == 1) stones1++;
+      else if (cell == 2) stones2++;
+    }
+    int opponent = (stones1 == stones2) ? 1 : 2;
+    _goban[y * _boardSize.first + x] = opponent;
+    if (opponent == 1) stones1++; else stones2++;
+    _aiPlayer = (stones1 > stones2) ? 2 : 1;
   } catch (...) {
     sendError("Error parsing TURN command payload");
     return;
@@ -221,7 +235,8 @@ void Brain::Brain::handleBegin(const std::string &payload) {
   std::string command = payload;
   auto middle =
       (_boardSize.second / 2) * _boardSize.first + (_boardSize.first / 2);
-  _goban[middle] = 1;
+  _aiPlayer = 1;
+  _goban[middle] = _aiPlayer;
   sendCoordinate(middle % _boardSize.first, middle / _boardSize.first);
 }
 
@@ -383,6 +398,13 @@ void Brain::Brain::handleRestart(const std::string &payload) {
     return;
   }
   sendOk();
+  int stones1 = 0;
+  int stones2 = 0;
+  for (int cell : _goban) {
+    if (cell == 1) stones1++;
+    else if (cell == 2) stones2++;
+  }
+  _aiPlayer = (stones1 > stones2) ? 2 : 1;
 }
 
 /**
@@ -406,6 +428,13 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
       return;
     }
     _goban[y * _boardSize.first + x] = 0;
+    int stones1 = 0;
+    int stones2 = 0;
+    for (int cell : _goban) {
+      if (cell == 1) stones1++;
+      else if (cell == 2) stones2++;
+    }
+    _aiPlayer = (stones1 > stones2) ? 2 : 1;
   } catch (...) {
     sendError("Error parsing TAKEBACK command payload: " + command);
   }
@@ -428,7 +457,7 @@ void Brain::Brain::handlePlay(const std::string &payload) {
     sendError("PLAY command malformed: expected format 'X,Y'");
     return;
   }
-  command[comma_pos] = ' ';
+  if (comma_pos != std::string::npos) command[comma_pos] = ' ';
   std::stringstream ss(command);
   int x, y;
   try {
@@ -448,7 +477,7 @@ void Brain::Brain::handlePlay(const std::string &payload) {
               std::to_string(y) + ") is already occupied");
     return;
   }
-  _goban[cellIndex] = 1;
+  _goban[cellIndex] = _aiPlayer;
   sendCoordinate(x, y);
 }
 
@@ -517,6 +546,13 @@ void Brain::Brain::handleSuggest(const std::string &payload) {
 void Brain::Brain::handleDone(const std::string &payload) {
   std::string command = payload;
   boardIsActivated = false;
+  int stones1 = 0;
+  int stones2 = 0;
+  for (int cell : _goban) {
+    if (cell == 1) stones1++;
+    else if (cell == 2) stones2++;
+  }
+  _aiPlayer = (stones1 > stones2) ? 2 : 1;
   findBestMove();
 }
 
@@ -568,14 +604,19 @@ void Brain::Brain::findBestMove() {
   std::pair<int, std::size_t> bestMove = {
       std::numeric_limits<int>::min(),
       std::numeric_limits<std::size_t>::max()};
+  std::size_t lastBestMove = std::numeric_limits<std::size_t>::max();
 
   try {
     for (int depth = 1; depth <= Constants::DEPTH_LEVEL; ++depth) {
       auto currentMove =
           minimax(_goban, depth, true, std::numeric_limits<int>::min(),
-                  std::numeric_limits<int>::max());
+                  std::numeric_limits<int>::max(), lastBestMove);
       if (!_timeUp) {
         bestMove = currentMove;
+        lastBestMove = bestMove.second;
+        if (bestMove.first >= 9000000) {
+          break;
+        }
       } else {
         break;
       }
@@ -584,14 +625,14 @@ void Brain::Brain::findBestMove() {
   }
 
   if (bestMove.second != std::numeric_limits<std::size_t>::max()) {
-    _goban[bestMove.second] = 1;
+    _goban[bestMove.second] = _aiPlayer;
     sendCoordinate(bestMove.second % _boardSize.first,
                    bestMove.second / _boardSize.first);
   } else {
     State possibleMoves = getPossibleMoves(_goban);
     if (!possibleMoves.empty()) {
       std::size_t move = possibleMoves[0];
-      _goban[move] = 1;
+      _goban[move] = _aiPlayer;
       sendCoordinate(move % _boardSize.first, move / _boardSize.first);
     } else {
       sendError("No valid move found");
@@ -616,7 +657,9 @@ void Brain::Brain::findBestMove() {
  */
 std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
                                                   bool maximizingPlayer,
-                                                  int alpha, int beta) {
+                                                  int alpha, int beta,
+                                                  std::size_t priorityMove,
+                                                  std::size_t lastMove) {
   auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::steady_clock::now() - _startTime)
                      .count();
@@ -626,13 +669,26 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   }
 
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();
+  int opponent = (_aiPlayer == 1) ? 2 : 1;
 
-  if (checkWinCondition(state, 1)) {
-    return {10000000 - (10 - depth), NO_MOVE};
-  } else if (checkWinCondition(state, 2)) {
-    return {-10000000 + (10 - depth), NO_MOVE};
-  } else if (depth == 0 || isBoardFull(state)) {
-    return {evaluate(state, 1), NO_MOVE};
+  if (lastMove != NO_MOVE) {
+    if (maximizingPlayer) {
+      if (checkWinCondition(state, opponent, lastMove))
+        return {-10000000 + (10 - depth), NO_MOVE};
+    } else {
+      if (checkWinCondition(state, _aiPlayer, lastMove))
+        return {10000000 - (10 - depth), NO_MOVE};
+    }
+  } else {
+    if (checkWinCondition(state, _aiPlayer)) {
+      return {10000000 - (10 - depth), NO_MOVE};
+    } else if (checkWinCondition(state, opponent)) {
+      return {-10000000 + (10 - depth), NO_MOVE};
+    }
+  }
+
+  if (depth == 0 || isBoardFull(state)) {
+    return {evaluate(state, _aiPlayer), NO_MOVE};
   }
   State possibleMoves = getPossibleMoves(state);
   std::size_t bestMove = NO_MOVE;
@@ -641,11 +697,18 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
     return {0, NO_MOVE};
   }
 
+  if (priorityMove != NO_MOVE) {
+    auto it = std::find(possibleMoves.begin(), possibleMoves.end(), priorityMove);
+    if (it != possibleMoves.end()) {
+      std::iter_swap(possibleMoves.begin(), it);
+    }
+  }
+
   if (maximizingPlayer) {
     int maxEval = std::numeric_limits<int>::min();
     for (std::size_t move : possibleMoves) {
-      state[move] = 1;
-      int eval = minimax(state, depth - 1, false, alpha, beta).first;
+      state[move] = _aiPlayer;
+      int eval = minimax(state, depth - 1, false, alpha, beta, NO_MOVE, move).first;
       state[move] = 0;
 
       if (eval > maxEval) {
@@ -663,8 +726,8 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   } else {
     int minEval = std::numeric_limits<int>::max();
     for (std::size_t move : possibleMoves) {
-      state[move] = 2;
-      int eval = minimax(state, depth - 1, true, alpha, beta).first;
+      state[move] = opponent;
+      int eval = minimax(state, depth - 1, true, alpha, beta, NO_MOVE, move).first;
       state[move] = 0;
 
       if (eval < minEval) {
@@ -709,45 +772,70 @@ bool Brain::Brain::isBoardFull(const State &state) {
  * @return true If the player has five in a row.
  * @return false Otherwise.
  */
-bool Brain::Brain::checkWinCondition(const State &state, int player) {
-  for (int i = 0; i < _boardSize.second; ++i) {
-    for (int j = 0; j < _boardSize.first; ++j) {
-      if (state[i * _boardSize.first + j] == player) {
-        if (j <= _boardSize.first - 5) {
-          if (state[i * _boardSize.first + j + 1] == player &&
-              state[i * _boardSize.first + j + 2] == player &&
-              state[i * _boardSize.first + j + 3] == player &&
-              state[i * _boardSize.first + j + 4] == player) {
-            return true;
+bool Brain::Brain::checkWinCondition(const State &state, int player, std::size_t lastMove) {
+  if (lastMove == std::numeric_limits<std::size_t>::max()) {
+    for (int i = 0; i < _boardSize.second; ++i) {
+      for (int j = 0; j < _boardSize.first; ++j) {
+        if (state[i * _boardSize.first + j] == player) {
+          if (j <= _boardSize.first - 5) {
+            if (state[i * _boardSize.first + j + 1] == player &&
+                state[i * _boardSize.first + j + 2] == player &&
+                state[i * _boardSize.first + j + 3] == player &&
+                state[i * _boardSize.first + j + 4] == player) {
+              return true;
+            }
           }
-        }
-        if (i <= _boardSize.second - 5) {
-          if (state[(i + 1) * _boardSize.first + j] == player &&
-              state[(i + 2) * _boardSize.first + j] == player &&
-              state[(i + 3) * _boardSize.first + j] == player &&
-              state[(i + 4) * _boardSize.first + j] == player) {
-            return true;
+          if (i <= _boardSize.second - 5) {
+            if (state[(i + 1) * _boardSize.first + j] == player &&
+                state[(i + 2) * _boardSize.first + j] == player &&
+                state[(i + 3) * _boardSize.first + j] == player &&
+                state[(i + 4) * _boardSize.first + j] == player) {
+              return true;
+            }
           }
-        }
-        if (i <= _boardSize.second - 5 && j <= _boardSize.first - 5) {
-          if (state[(i + 1) * _boardSize.first + j + 1] == player &&
-              state[(i + 2) * _boardSize.first + j + 2] == player &&
-              state[(i + 3) * _boardSize.first + j + 3] == player &&
-              state[(i + 4) * _boardSize.first + j + 4] == player) {
-            return true;
+          if (i <= _boardSize.second - 5 && j <= _boardSize.first - 5) {
+            if (state[(i + 1) * _boardSize.first + j + 1] == player &&
+                state[(i + 2) * _boardSize.first + j + 2] == player &&
+                state[(i + 3) * _boardSize.first + j + 3] == player &&
+                state[(i + 4) * _boardSize.first + j + 4] == player) {
+              return true;
+            }
           }
-        }
-        if (i >= 4 && j <= _boardSize.first - 5) {
-          if (state[(i - 1) * _boardSize.first + j + 1] == player &&
-              state[(i - 2) * _boardSize.first + j + 2] == player &&
-              state[(i - 3) * _boardSize.first + j + 3] == player &&
-              state[(i - 4) * _boardSize.first + j + 4] == player) {
-            return true;
+          if (i >= 4 && j <= _boardSize.first - 5) {
+            if (state[(i - 1) * _boardSize.first + j + 1] == player &&
+                state[(i - 2) * _boardSize.first + j + 2] == player &&
+                state[(i - 3) * _boardSize.first + j + 3] == player &&
+                state[(i - 4) * _boardSize.first + j + 4] == player) {
+              return true;
+            }
           }
         }
       }
     }
+    return false;
   }
+
+  int x = lastMove % _boardSize.first;
+  int y = lastMove / _boardSize.first;
+  int directions[4][2] = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+
+  for (auto &dir : directions) {
+    int count = 1;
+    for (int k = 1; k < 5; ++k) {
+      int nx = x + dir[0] * k;
+      int ny = y + dir[1] * k;
+      if (nx < 0 || nx >= _boardSize.first || ny < 0 || ny >= _boardSize.second || state[ny * _boardSize.first + nx] != player) break;
+      count++;
+    }
+    for (int k = 1; k < 5; ++k) {
+      int nx = x - dir[0] * k;
+      int ny = y - dir[1] * k;
+      if (nx < 0 || nx >= _boardSize.first || ny < 0 || ny >= _boardSize.second || state[ny * _boardSize.first + nx] != player) break;
+      count++;
+    }
+    if (count >= 5) return true;
+  }
+
   return false;
 }
 
@@ -790,19 +878,6 @@ State Brain::Brain::getPossibleMoves(const State &state) {
 }
 
 /**
- * @brief Evaluates the score of a player on the board.
- *
- * @param state Current representation of the board.
- * @param player Identifier of the player to evaluate (1 or 2).
- * @return int Total score based on patterns.
- */
-int Brain::Brain::evaluate(const State &state, int player) {
-  int myScore = countPatterns(state, player);
-  int enemyScore = countPatterns(state, (player == 1) ? 2 : 1);
-  return static_cast<int>(myScore - enemyScore * 1.5);
-}
-
-/**
  * @brief Calculates a score for a given pattern length (k) and its open ends.
  *
  * @param k The length of the consecutive pieces.
@@ -835,27 +910,29 @@ int calculateScore(int k, bool openStart, bool openEnd) {
 };
 
 /**
- * @brief Counts patterns (lines of consecutive pieces) for a given player on the board.
- * @param state The current board state.
- * @param player The ID of the player to count patterns for (1 or 2).
- * @return int The total score from all patterns found for the player.
+ * @brief Evaluates the score of a player on the board.
+ *
+ * @param state Current representation of the board.
+ * @param player Identifier of the player to evaluate (1 or 2).
+ * @return int Total score based on patterns.
  */
-int Brain::Brain::countPatterns(const State &state, int player) {
-  int score = 0;
+int Brain::Brain::evaluate(const State &state, int player) {
+  int scores[3] = {0, 0, 0};
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first;) {
       int cell = state[y * _boardSize.first + x];
-      if (cell == player) {
+      if (cell != 0) {
+        int p = cell;
         int k = 1;
         while (x + k < _boardSize.first &&
-               state[y * _boardSize.first + (x + k)] == player) {
+               state[y * _boardSize.first + (x + k)] == p) {
           k++;
         }
         bool openStart = (x > 0 && state[y * _boardSize.first + (x - 1)] == 0);
         bool openEnd = (x + k < _boardSize.first &&
                         state[y * _boardSize.first + (x + k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
         x += k;
       } else {
         x++;
@@ -864,18 +941,19 @@ int Brain::Brain::countPatterns(const State &state, int player) {
   }
 
   for (int x = 0; x < _boardSize.first; ++x) {
-    for (int y = 0; y < _boardSize.second;) {
+    for (int y = 0; y < _boardSize.second; ) {
       int cell = state[y * _boardSize.first + x];
-      if (cell == player) {
+      if (cell != 0) {
+        int p = cell;
         int k = 1;
         while (y + k < _boardSize.second &&
-               state[(y + k) * _boardSize.first + x] == player) {
+               state[(y + k) * _boardSize.first + x] == p) {
           k++;
         }
         bool openStart = (y > 0 && state[(y - 1) * _boardSize.first + x] == 0);
         bool openEnd = (y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + x] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
         y += k;
       } else {
         y++;
@@ -885,47 +963,53 @@ int Brain::Brain::countPatterns(const State &state, int player) {
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first; ++x) {
-      if (state[y * _boardSize.first + x] == player) {
+      int cell = state[y * _boardSize.first + x];
+      if (cell != 0) {
+        int p = cell;
         if (x > 0 && y > 0 &&
-            state[(y - 1) * _boardSize.first + (x - 1)] == player) {
+            state[(y - 1) * _boardSize.first + (x - 1)] == p) {
           continue;
         }
-        int k = 0;
+        int k = 1;
         while (y + k < _boardSize.second && x + k < _boardSize.first &&
-               state[(y + k) * _boardSize.first + (x + k)] == player) {
+               state[(y + k) * _boardSize.first + (x + k)] == p) {
           k++;
         }
         bool openStart = (x > 0 && y > 0 &&
                           state[(y - 1) * _boardSize.first + (x - 1)] == 0);
         bool openEnd = (x + k < _boardSize.first && y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + (x + k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
       }
     }
   }
 
   for (int y = 0; y < _boardSize.second; ++y) {
     for (int x = 0; x < _boardSize.first; ++x) {
-      if (state[y * _boardSize.first + x] == player) {
+      int cell = state[y * _boardSize.first + x];
+      if (cell != 0) {
+        int p = cell;
         if (x < _boardSize.first - 1 && y > 0 &&
-            state[(y - 1) * _boardSize.first + (x + 1)] == player) {
+            state[(y - 1) * _boardSize.first + (x + 1)] == p) {
           continue;
         }
-        int k = 0;
+        int k = 1;
         while (y + k < _boardSize.second && x - k >= 0 &&
-               state[(y + k) * _boardSize.first + (x - k)] == player) {
+               state[(y + k) * _boardSize.first + (x - k)] == p) {
           k++;
         }
         bool openStart = (x < _boardSize.first - 1 && y > 0 &&
                           state[(y - 1) * _boardSize.first + (x + 1)] == 0);
         bool openEnd = (x - k >= 0 && y + k < _boardSize.second &&
                         state[(y + k) * _boardSize.first + (x - k)] == 0);
-        score += calculateScore(k, openStart, openEnd);
+        scores[p] += calculateScore(k, openStart, openEnd);
       }
     }
   }
 
-  return score;
+  int myScore = scores[player];
+  int enemyScore = scores[(player == 1) ? 2 : 1];
+  return static_cast<int>(myScore - enemyScore * 1.5);
 }
 
 /**
