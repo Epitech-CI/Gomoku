@@ -55,7 +55,6 @@ namespace Brain {
 
       // Multi-threading process
       int inputHandler();
-      int logicLoop();
 
       // Logic responses
       void sendResponse(const std::string &response);
@@ -85,14 +84,10 @@ namespace Brain {
       bool boardIsActivated{false};
       std::pair<int, int> _boardSize{0, 0};
       State _goban;
-      std::thread _inputHandler;
-      std::atomic<bool> _running{false};
+      bool _running{false};
       std::unordered_map<std::string,
                          std::function<void(const std::string &payload)>>
           _commands;
-      std::queue<std::string> _commandQueue;
-      std::mutex _queueMutex;
-      std::mutex _responseMutex;
       std::condition_variable _cv;
       std::chrono::steady_clock::time_point _startTime;
       bool _timeUp{false};

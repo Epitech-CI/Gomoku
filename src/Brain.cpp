@@ -20,8 +20,7 @@
 int Brain::Brain::start() {
   initializeCommands();
   _running = true;
-  _inputHandler = std::thread(&Brain::Brain::inputHandler, this);
-  return logicLoop();
+  return inputHandler();
 }
 
 /**
@@ -34,59 +33,6 @@ int Brain::Brain::start() {
  */
 int Brain::Brain::stop() {
   _running = false;
-  if (_inputHandler.joinable())
-    _inputHandler.detach();
-  return Constants::SUCCESS;
-}
-
-/**
- * @brief Main logic loop of the engine.
- *
- * Continuously retrieves and processes commands from the internal command queue.
- * It continues until the engine is stopped AND the queue is empty.
- *
- * @return int SUCCESS status code.
- */
-int Brain::Brain::logicLoop() {
-  while (true) {
-    std::string payload;
-    bool doesMessageExist = false;
-    {
-      std::unique_lock<std::mutex> lock(_queueMutex);
-      _cv.wait(lock, [this] { return !_commandQueue.empty() || !_running; });
-      if (!_running && _commandQueue.empty())
-        break;
-      if (_commandQueue.empty())
-        continue;
-      payload = _commandQueue.front();
-      _commandQueue.pop();
-    }
-    if (payload.empty())
-      continue;
-    if (payload.find("DONE") == 0) {
-      boardIsActivated = false;
-    }
-    if (boardIsActivated) {
-      handleBoard(payload);
-      continue;
-    }
-    for (const auto &command : _commands) {
-      if (payload.find(command.first) == 0) {
-        std::string commandPayload = payload.substr(command.first.size());
-        if (command.first == "BOARD") {
-          boardIsActivated = true;
-          doesMessageExist = true;
-          break;
-        }
-        command.second(commandPayload);
-        doesMessageExist = true;
-        break;
-      }
-    }
-    if (!doesMessageExist) {
-      sendUnknown(payload);
-    }
-  }
   return Constants::SUCCESS;
 }
 
@@ -101,23 +47,42 @@ int Brain::Brain::logicLoop() {
  */
 int Brain::Brain::inputHandler() {
   std::string data;
-  while (_running) {
-    if (std::getline(std::cin, data)) {
-      size_t end = data.find_last_not_of("\r\n\t ");
-      if (end != std::string::npos) {
-        data = data.substr(0, end + 1);
-      } else {
-        data.clear();
-      }
-      {
-        std::lock_guard<std::mutex> lock(_queueMutex);
-        _commandQueue.push(data);
-      }
-      _cv.notify_one();
+  while (_running && std::getline(std::cin, data)) {
+    bool doesMessageExist = false;
+    size_t end = data.find_last_not_of("\r\n\t ");
+    if (end != std::string::npos) {
+      data = data.substr(0, end + 1);
     } else {
-      _running = false;
-      _cv.notify_one();
+      data.clear();
+    }
+    if (data.empty()) {
+      continue;
+    }
+    if (data.find("DONE") == 0) {
+      boardIsActivated = false;
+    }
+    if (boardIsActivated) {
+      handleBoard(data);
+      continue;
+    }
+    for (const auto &command : _commands) {
+      if (data.find(command.first) == 0) {
+        std::string commandPayload = data.substr(command.first.size());
+        if (command.first == "BOARD") {
+          boardIsActivated = true;
+          doesMessageExist = true;
+          break;
+        }
+        command.second(commandPayload);
+        doesMessageExist = true;
+        break;
+      }
+    }
+    if (!_running) {
       break;
+    }
+    if (!doesMessageExist) {
+      sendUnknown(data);
     }
   }
   return Constants::SUCCESS;
@@ -129,7 +94,6 @@ int Brain::Brain::inputHandler() {
  * @param response The string message to be printed.
  */
 void Brain::Brain::sendResponse(const std::string &response) {
-  std::lock_guard<std::mutex> lock(_responseMutex);
   std::cout << response << std::endl;
 }
 
@@ -291,8 +255,11 @@ void Brain::Brain::handleBoard(const std::string &payload) {
     }
   }
   std::stringstream ss(command);
-  int x, y, player;
+  int x = -1, y = -1, player = -1;
   ss >> x >> y >> player;
+  if (ss.fail()) {
+    return;
+  }
   if (x < 0 || x >= _boardSize.first || y < 0 || y >= _boardSize.second) {
     sendError("Invalid BOARD coordinates: (" + std::to_string(x) + ", " +
               std::to_string(y) + ")");
@@ -363,9 +330,8 @@ void Brain::Brain::handleInfo(const std::string &payload) {
  *
  * @param payload Command payload.
  */
-void Brain::Brain::handleEnd(const std::string &payload) {
-  std::string command = payload;
-  exit(0);
+void Brain::Brain::handleEnd([[maybe_unused]]const std::string &payload) {
+  _running = false;
 }
 
 /**
@@ -375,8 +341,7 @@ void Brain::Brain::handleEnd(const std::string &payload) {
  *
  * @param payload Command payload.
  */
-void Brain::Brain::handleAbout(const std::string &payload) {
-  std::string command = payload;
+void Brain::Brain::handleAbout([[maybe_unused]]const std::string &payload) {
   sendResponse(
       "name=\"Ai\", version=\"1.0\", author=\"Heisen & zif\", "
       "country=\"France\"");
@@ -472,7 +437,6 @@ void Brain::Brain::handleTakeback(const std::string &payload) {
     _aiPlayer = (stones1 > stones2) ? 2 : 1;
   } catch (...) {
     sendError("Error parsing TAKEBACK command payload: " + command);
-    return;
   }
 }
 
