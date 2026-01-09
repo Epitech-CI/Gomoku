@@ -109,6 +109,9 @@ int Brain::Brain::inputHandler() {
       } else {
         data.clear();
       }
+      if (data.find("END") == 0) {
+        _endReceived = true;
+      }
       {
         std::lock_guard<std::mutex> lock(_queueMutex);
         _commandQueue.push(data);
@@ -658,6 +661,8 @@ void Brain::Brain::findBestMove() {
       }
     }
   } catch (const std::runtime_error &e) {
+    if (_endReceived)
+      return;
   }
 
   if (bestMove.second != std::numeric_limits<std::size_t>::max()) {
@@ -702,6 +707,9 @@ std::pair<int, std::size_t> Brain::Brain::minimax(State &state, int depth,
   if (elapsed > Constants::MAX_TIME_LEFT) {
     _timeUp = true;
     throw std::runtime_error("Time is up");
+  }
+  if (_endReceived) {
+    throw std::runtime_error("END received");
   }
 
   constexpr std::size_t NO_MOVE = std::numeric_limits<std::size_t>::max();

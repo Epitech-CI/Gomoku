@@ -96,5 +96,6 @@ namespace Brain {
       std::condition_variable _cv;
       std::chrono::steady_clock::time_point _startTime;
       bool _timeUp{false};
+      std::atomic<bool> _endReceived{false};
   };
 }  // namespace Brain
